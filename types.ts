@@ -129,3 +129,11 @@ export interface VideoOperation {
         }[];
     };
 }
+
+// FIX: Added AnalyticsData interface for dashboard analytics.
+export interface AnalyticsData {
+    followerGrowth: { value: number; trend: number };
+    engagementRate: { value: number; trend: number };
+    reach: { value: number; trend: number };
+    weeklyPerformance: number[]; // 7 values for 7 days
+}

@@ -1,196 +1,198 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ai } from '../services/geminiService';
-import { generateVideo } from '../services/geminiService';
-import { VideoOperation, Package } from '../types';
-import { LoadingSpinner, VideoIcon } from '../components/icons';
+import React, { useState, useRef } from 'react';
+import { Package, VideoOperation } from '../types';
+import { GoogleGenAI } from '@google/genai';
+import { toBase64 } from '../utils/helpers';
+import { LoadingSpinner, VideoIcon, Wand2Icon, Upload } from '../components/icons';
 
 interface VideoGeneratorPageProps {
-  selectedPackage: Package | null;
-  onBackToDashboard: () => void;
+    selectedPackage: Package;
+    onBackToDashboard: () => void;
 }
 
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 const loadingMessages = [
-    "جاري إعداد المشهد السينمائي...",
-    "تجميع الإطارات معًا بأسلوب فني...",
-    "الريندر الآن بجودة عالية...",
-    "تطبيق التأثيرات السحرية...",
-    "اللمسات الأخيرة على الفيديو...",
-    "تحضير تحفتك الفنية...",
+    "يتم الآن استدعاء خلايا الإبداع السينمائي...",
+    "تحويل أفكارك إلى مشاهد بصرية مذهلة...",
+    "الذكاء الاصطناعي يقوم بعملية المونتاج...",
+    "تصيير المشاهد النهائية، قد يستغرق هذا بعض الوقت...",
+    "اللمسات الأخيرة على تحفتك الفنية...",
 ];
-
-type GeneratedVideo = {
-    id: string;
-    prompt: string;
-    status: 'processing' | 'completed' | 'failed';
-    url?: string;
-    operation: VideoOperation;
-};
-
-// IMPORTANT: The API key is sourced from an environment variable for security.
-// Ensure 'API_KEY' is set in your Vercel project settings.
-const GEMINI_API_KEY = process.env.API_KEY;
-
 
 const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage, onBackToDashboard }) => {
     const [prompt, setPrompt] = useState('');
-    const [videos, setVideos] = useState<GeneratedVideo[]>([]);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imageBase64, setImageBase64] = useState<string | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
+    
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const intervalRef = useRef<number | null>(null);
 
-    // Fallback to a default package if none is selected
-    const currentPackage = useMemo(() => selectedPackage || {
-        name: 'Default', price: 0, postsPerMonth: 8, videosPerMonth: 0, features: [], isFeatured: false
-    }, [selectedPackage]);
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setImageFile(file);
+            const b64 = await toBase64(file) as string;
+            // remove data:image/...;base64, prefix
+            const b64Data = b64.split(',')[1];
+            setImageBase64(b64Data);
+        }
+    };
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-             setLoadingMessage(prev => {
-                const currentIndex = loadingMessages.indexOf(prev);
-                return loadingMessages[(currentIndex + 1) % loadingMessages.length];
-            });
-        }, 3000);
-        return () => clearInterval(interval);
-    }, []);
-
-     useEffect(() => {
-        if (!GEMINI_API_KEY) {
-            console.error("Gemini API Key is missing for video polling.");
+    const handleGenerate = async () => {
+        if (!prompt) {
+            setError('الرجاء إدخال وصف للفيديو.');
             return;
         }
 
-        const processingVideos = videos.filter(v => v.status === 'processing');
-        if (processingVideos.length === 0) return;
+        setIsGenerating(true);
+        setError(null);
+        setVideoUrl(null);
+        setLoadingMessage(loadingMessages[0]);
 
-        const pollInterval = setInterval(async () => {
-            for (const video of processingVideos) {
-                try {
-                    let updatedOp = await ai.operations.getVideosOperation({ operation: video.operation });
-                    
-                    if (updatedOp.done) {
-                        const downloadLink = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
-                        if(downloadLink) {
-                            const response = await fetch(`${downloadLink}&key=${GEMINI_API_KEY}`);
-                            const blob = await response.blob();
-                            const url = URL.createObjectURL(blob);
-                            setVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'completed', url: url } : v));
-                        } else {
-                             setVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'failed' } : v));
-                        }
-                    }
-                } catch (error) {
-                    console.error('Polling failed for video:', video.id, error);
-                    setVideos(prev => prev.map(v => v.id === video.id ? { ...v, status: 'failed' } : v));
-                }
-            }
-        }, 10000); // Poll every 10 seconds
+        intervalRef.current = window.setInterval(() => {
+            setLoadingMessage(prev => {
+                const currentIndex = loadingMessages.indexOf(prev);
+                const nextIndex = (currentIndex + 1) % loadingMessages.length;
+                return loadingMessages[nextIndex];
+            });
+        }, 5000);
 
-        return () => clearInterval(pollInterval);
-    }, [videos]);
-
-
-    const handleGenerate = async () => {
-        if (!prompt.trim() || videos.length >= currentPackage.videosPerMonth) return;
-
-        const tempId = Date.now().toString();
-        
         try {
-            const operation = await generateVideo(prompt);
-             const newVideo: GeneratedVideo = {
-                id: tempId,
-                prompt: prompt,
-                status: 'processing',
-                operation: operation,
-            };
-            setVideos(prev => [newVideo, ...prev]);
-            setPrompt('');
+            let operation: VideoOperation;
 
-        } catch (error) {
-            console.error("Failed to initiate video generation", error);
+            if (imageBase64 && imageFile) {
+                operation = await ai.models.generateVideos({
+                    model: 'veo-2.0-generate-001',
+                    prompt,
+                    image: {
+                        imageBytes: imageBase64,
+                        mimeType: imageFile.type,
+                    },
+                    config: { numberOfVideos: 1 }
+                });
+            } else {
+                operation = await ai.models.generateVideos({
+                    model: 'veo-2.0-generate-001',
+                    prompt,
+                    config: { numberOfVideos: 1 }
+                });
+            }
+
+            while (!operation.done) {
+                await new Promise(resolve => setTimeout(resolve, 10000));
+                operation = await ai.operations.getVideosOperation({ operation: operation as any }); // Cast to any to satisfy type
+            }
+
+            if (operation.response?.generatedVideos?.[0]?.video?.uri) {
+                const downloadLink = operation.response.generatedVideos[0].video.uri;
+                // Fetch the video as a blob and create an object URL to avoid exposing API key in the video src
+                const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to download video: ${response.statusText}`);
+                }
+                const videoBlob = await response.blob();
+                const objectUrl = URL.createObjectURL(videoBlob);
+                setVideoUrl(objectUrl);
+            } else {
+                throw new Error('فشل إنشاء الفيديو. لم يتم إرجاع رابط صالح.');
+            }
+
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'حدث خطأ غير متوقع.');
+        } finally {
+            setIsGenerating(false);
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
         }
     };
-    
-    const isProcessing = videos.some(v => v.status === 'processing');
-    const hasReachedLimit = videos.length >= currentPackage.videosPerMonth;
+
+    const videosAllowed = selectedPackage.videosPerMonth;
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white p-4 sm:p-8 animate-fade-in">
-            <header className="flex flex-col sm:flex-row justify-between sm:items-center mb-10 gap-4">
+        <div className="min-h-screen bg-slate-900 text-white p-4 sm:p-8">
+            <header className="flex justify-between items-center mb-10">
                 <div className="flex items-center gap-3">
                     <VideoIcon className="w-10 h-10 text-teal-400" />
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-extrabold">استوديو الفيديو بالذكاء الاصطناعي</h1>
-                        <p className="text-slate-400 text-sm sm:text-base">حوّل أفكارك لفيديوهات قصيرة جذابة بضغطة زر.</p>
+                        <h1 className="text-3xl font-extrabold">استوديو الفيديو بالذكاء الاصطناعي</h1>
+                        <p className="text-slate-400">حوّل أفكارك إلى فيديوهات احترافية.</p>
                     </div>
                 </div>
-                <button onClick={onBackToDashboard} className="bg-slate-700 text-white font-bold py-2 px-4 rounded-full hover:bg-slate-600 transition w-full sm:w-auto">
-                    الرجوع للوحة التحكم
+                <button onClick={onBackToDashboard} className="bg-slate-700 text-white font-bold py-2 px-4 rounded-full hover:bg-slate-600 transition">
+                    العودة للوحة التحكم
                 </button>
             </header>
-            
-            <section className="bg-slate-800 p-6 rounded-2xl border border-slate-700 mb-8">
-                <div className="flex flex-col md:flex-row gap-4">
-                    <textarea 
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="اكتب وصف تفصيلي للفيديو اللي عايزه... مثال: 'لقطة درون سريعة لسيارة رياضية حمراء تجري في طريق ساحلي وقت الغروب، مع تركيز على لمعان السيارة وانعكاس الشمس'"
-                        rows={3}
-                        className="flex-1 p-4 bg-slate-700 rounded-md border border-slate-600 focus:ring-2 focus:ring-teal-400 focus:outline-none"
-                    />
-                    <button 
-                        onClick={handleGenerate} 
-                        disabled={!prompt.trim() || isProcessing || hasReachedLimit}
-                        className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-8 rounded-md hover:from-teal-600 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isProcessing ? 'جاري المعالجة...' : hasReachedLimit ? 'وصلت للحد الأقصى' : '🚀 إنشاء الفيديو'}
-                    </button>
-                </div>
-                <div className="text-center mt-4">
-                     <p className="text-sm text-slate-400">
-                        الفيديوهات المستخدمة: <span className="font-bold text-white">{videos.length} / {currentPackage.videosPerMonth}</span>
-                    </p>
-                    <p className="text-xs text-slate-500 mt-2">نصيحة: بعد التحميل، أضف موسيقى تريندينج من انستجرام أو تيك توك لزيادة الانتشار!</p>
-                </div>
-            </section>
-            
-            <section>
-                <h2 className="text-2xl font-bold mb-4">الفيديوهات اللي عملتها</h2>
-                {videos.length === 0 ? (
-                    <div className="text-center py-16 text-slate-500">
-                        <VideoIcon className="w-16 h-16 mx-auto mb-4"/>
-                        <p>لسه معملتش أي فيديوهات.</p>
+
+            <div className="max-w-4xl mx-auto">
+                <div className="bg-slate-800 rounded-2xl p-8 border border-slate-700">
+                    <div className="text-center mb-6">
+                        <p className="text-lg">رصيد الفيديوهات المتاح لهذا الشهر: <span className="font-bold text-2xl text-teal-300">{videosAllowed}</span></p>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {videos.map(video => (
-                            <div key={video.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-                                <div className="aspect-video bg-slate-900 flex items-center justify-center">
-                                    {video.status === 'processing' && (
-                                        <div className="text-center p-4">
-                                            <LoadingSpinner className="w-10 h-10 text-teal-400 mx-auto mb-4" />
-                                            <p>{loadingMessage}</p>
-                                        </div>
-                                    )}
-                                    {video.status === 'completed' && video.url && (
-                                        <video src={video.url} controls className="w-full h-full object-cover"></video>
-                                    )}
-                                     {video.status === 'failed' && (
-                                        <div className="text-center p-4 text-red-400">
-                                            <p>فشل إنشاء الفيديو</p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4">
-                                    <p className="text-slate-300 text-sm truncate">{video.prompt}</p>
-                                    {video.status === 'completed' && video.url && (
-                                        <a href={video.url} download={`${video.prompt.slice(0, 20)}.mp4`} className="block w-full text-center mt-4 bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition">
-                                            تحميل
-                                        </a>
-                                    )}
+
+                    <div className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">وصف الفيديو (Prompt)</label>
+                            <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                rows={4}
+                                placeholder="مثال: A neon hologram of a cat driving at top speed"
+                                className="w-full p-3 bg-slate-700 rounded-md border border-slate-600 focus:ring-2 focus:ring-teal-400 focus:outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">إرفاق صورة (اختياري)</label>
+                            <div onClick={() => fileInputRef.current?.click()} className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-600 border-dashed rounded-md cursor-pointer hover:border-teal-400">
+                                <div className="space-y-1 text-center">
+                                    <Upload className="mx-auto h-12 w-12 text-slate-500" />
+                                    <p className="text-sm text-slate-400">{imageFile ? `تم اختيار: ${imageFile.name}` : 'انقر لرفع صورة'}</p>
+                                    {imageFile && <p className="text-xs text-green-400">تم الإرفاق بنجاح!</p>}
                                 </div>
                             </div>
-                        ))}
+                            <input ref={fileInputRef} type="file" className="sr-only" accept="image/*" onChange={handleFileChange} />
+                        </div>
                     </div>
-                )}
-            </section>
+                    <div className="mt-8 text-center">
+                        <button onClick={handleGenerate} disabled={isGenerating || videosAllowed <= 0} className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-8 rounded-full hover:from-teal-600 hover:to-blue-700 transition disabled:opacity-50 flex items-center gap-2 mx-auto">
+                            <Wand2Icon className="w-5 h-5" />
+                            {isGenerating ? 'جاري الإنشاء...' : 'إنشاء الفيديو'}
+                        </button>
+                         {videosAllowed <= 0 && <p className="text-sm text-yellow-400 mt-2">لقد استهلكت رصيدك من الفيديوهات لهذا الشهر.</p>}
+                    </div>
+                </div>
+
+                <div className="mt-10">
+                    {isGenerating && (
+                         <div className="text-center p-8 bg-slate-800/50 rounded-lg">
+                            <LoadingSpinner className="w-12 h-12 text-teal-400 mx-auto mb-4" />
+                            <p className="text-lg text-slate-300">{loadingMessage}</p>
+                            <p className="text-sm text-slate-500 mt-2">قد تستغرق هذه العملية عدة دقائق. لا تغلق الصفحة.</p>
+                         </div>
+                    )}
+                    {error && (
+                        <div className="text-center p-8 bg-red-900/50 rounded-lg text-red-300">
+                            <h3 className="font-bold">حدث خطأ</h3>
+                            <p>{error}</p>
+                        </div>
+                    )}
+                    {videoUrl && (
+                        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                            <h3 className="text-2xl font-bold mb-4 text-center text-white">الفيديو جاهز!</h3>
+                            <video src={videoUrl} controls autoPlay loop className="w-full max-w-2xl mx-auto rounded-md" />
+                            <div className="text-center mt-4">
+                                <a href={videoUrl} download="dr-business-video.mp4" className="bg-teal-600 text-white font-bold py-2 px-6 rounded-full hover:bg-teal-500 transition">
+                                    تحميل الفيديو
+                                </a>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

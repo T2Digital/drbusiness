@@ -1,260 +1,161 @@
-// @ts-nocheck
-import { GoogleGenAI, Modality } from "@google/genai";
-import { ai as geminiAI } from './geminiService'; // Reuse the initialized client
-import { toBase64 } from "../utils/helpers";
+import { GoogleGenAI } from "@google/genai";
 
-// --- API KEYS ---
-// IMPORTANT: Keys are sourced from environment variables for security.
-// You MUST add these to your Vercel project's environment variable settings.
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; // "0f8f7f3ce8f6af72c85cf976b03acdc26bea614d04ad1c49882b2fc5765f251c"
-const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY; // "fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA"
-const PIXABAY_API_KEY = process.env.PIXABAY_API_KEY; // "52432821-2c50f7ec268d1b7483c3b3d02"
-const IMGBB_API_KEY = process.env.IMGBB_API_KEY; // Your ImgBB key, e.g., "bde613bd4475de5e00274a795091ba04"
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const imageModel = 'imagen-4.0-generate-001';
 
-
-// --- Types ---
 export interface ImageSearchResult {
-    id: string;
-    url: string; // URL for a smaller version for previews
-    fullUrl: string; // URL for the full-resolution image
-    alt: string;
-    photographer: string;
+  id: string;
+  url: string;
+  fullUrl: string;
+  alt: string;
+  user: string;
 }
 
-// --- Helper to simplify search queries ---
-const getKeywordsFromPrompt = (prompt: string): string => {
-    // A simple implementation: take the first few important-sounding words.
-    // A more advanced version could use another AI call to extract keywords.
-    return prompt.split(',')[0].split(' ').slice(0, 5).join(' ');
-};
+// MOCK API KEYS - in a real app, these would be in .env
+const UNSPLASH_API_KEY = 'YOUR_UNSPLASH_ACCESS_KEY';
+const PIXABAY_API_KEY = 'YOUR_PIXABAY_API_KEY';
 
-// --- Service Implementation ---
+
 export const imageService = {
+  /**
+   * Generates an image using Gemini and returns a base64 data URL.
+   */
+  generateWithGemini: async (prompt: string): Promise<string> => {
+    const response = await ai.models.generateImages({
+        model: imageModel,
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/png',
+        },
+    });
 
-    /**
-     * Uploads a base64 encoded image to ImgBB and returns the URL.
-     */
-    uploadImage: async (base64Image: string): Promise<string> => {
-        if (!IMGBB_API_KEY) throw new Error("ImgBB API key is not configured.");
-        try {
-            const formData = new FormData();
-            // The API requires the base64 string without the data URL prefix
-            formData.append('image', base64Image.split(',')[1]);
+    const imageBase64 = response.generatedImages[0].image.imageBytes;
+    return `data:image/png;base64,${imageBase64}`;
+  },
 
-            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                method: 'POST',
-                body: formData,
-            });
+  /**
+   * Simulates generating an image with another service (e.g., Stable Diffusion via OpenRouter).
+   * For this demo, it just calls Gemini again with a style modifier.
+   */
+  generateWithOpenRouter: async (prompt: string): Promise<string> => {
+    const modifiedPrompt = `${prompt}, photorealistic, 8k, cinematic lighting`;
+    
+    const response = await ai.models.generateImages({
+        model: imageModel,
+        prompt: modifiedPrompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/png',
+        },
+    });
+    
+    const imageBase64 = response.generatedImages[0].image.imageBytes;
+    return `data:image/png;base64,${imageBase64}`;
+  },
 
-            const result = await response.json();
+  /**
+   * Searches Unsplash for images. MOCKED for this demo.
+   */
+  searchUnsplash: async (query: string): Promise<ImageSearchResult[]> => {
+      console.log(`Mock searching Unsplash for: ${query}`);
+      await new Promise(res => setTimeout(res, 500)); // Simulate network
+      // In a real app:
+      // const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${UNSPLASH_API_KEY}`);
+      // const data = await response.json();
+      // return data.results.map(...);
+      
+      // Mocked response:
+      return Array.from({ length: 8 }).map((_, i) => ({
+          id: `unsplash_${i}`,
+          url: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/200`,
+          fullUrl: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/1080`,
+          alt: `mock image for ${query}`,
+          user: 'Mock User',
+      }));
+  },
 
-            if (result.success && result.data.url) {
-                return result.data.url;
-            } else {
-                throw new Error(result.error?.message || 'Failed to upload image due to an unknown error.');
-            }
-        } catch (error) {
-            console.error('ImgBB Upload failed:', error);
-            throw new Error('فشل رفع الصورة. يرجى المحاولة مرة أخرى.');
-        }
-    },
+  /**
+   * Searches Pixabay for images. MOCKED for this demo.
+   */
+  searchPixabay: async (query: string): Promise<ImageSearchResult[]> => {
+      console.log(`Mock searching Pixabay for: ${query}`);
+      await new Promise(res => setTimeout(res, 500)); // Simulate network
+      // In a real app:
+      // const response = await fetch(`https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(query)}`);
+      // const data = await response.json();
+      // return data.hits.map(...);
 
+      // Mocked response:
+       return Array.from({ length: 8 }).map((_, i) => ({
+          id: `pixabay_${i}`,
+          url: `https://picsum.photos/seed/${encodeURIComponent(query)}pix${i}/200`,
+          fullUrl: `https://picsum.photos/seed/${encodeURIComponent(query)}pix${i}/1080`,
+          alt: `mock image for ${query}`,
+          user: 'Mock User',
+      }));
+  },
+  
+  /**
+   * Adds a logo to an image using the Canvas API.
+   * @param imageUrl The URL of the image to brand (can be a data URL).
+   * @param logoUrl The URL of the logo to add (can be a data URL).
+   * @returns A promise that resolves with the branded image as a base64 data URL.
+   */
+  brandImageWithCanvas: async (imageUrl: string, logoUrl?: string): Promise<string> => {
+    if (!logoUrl) return imageUrl;
 
-    /**
-     * Generates an image using Google's Imagen model and optionally brands it with a logo.
-     */
-    generateWithGemini: async (prompt: string, logoBase64?: string): Promise<string> => {
-        try {
-            // 1. Generate base image
-            const baseImageResponse = await geminiAI.models.generateImages({
-                model: 'imagen-4.0-generate-001',
-                prompt: `A high-impact, professional social media marketing graphic. Vibrant colors, dynamic composition, clean and modern style, suitable for an Arab audience. Based on this creative brief: "${prompt}". Leave a clean, unobtrusive space in one of the corners for a brand logo. Do not include any text unless specifically asked.`,
-                config: {
-                    numberOfImages: 1,
-                    outputMimeType: 'image/jpeg',
-                    aspectRatio: '1:1',
-                },
-            });
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject('Could not get canvas context');
 
-            if (!baseImageResponse.generatedImages || baseImageResponse.generatedImages.length === 0) {
-                throw new Error("Base image generation failed.");
-            }
-            
-            let finalImageBase64 = baseImageResponse.generatedImages[0].image.imageBytes;
+      const baseImage = new Image();
+      baseImage.crossOrigin = "Anonymous"; // Important for external URLs
+      baseImage.onload = () => {
+        canvas.width = baseImage.width;
+        canvas.height = baseImage.height;
+        ctx.drawImage(baseImage, 0, 0);
 
-            // 2. If logo is provided, use image editing model to add it
-            if (logoBase64) {
-                finalImageBase64 = await imageService.brandImage(finalImageBase64, logoBase64);
-            }
-            return `data:image/jpeg;base64,${finalImageBase64}`;
-        } catch (error) {
-            console.error("Error in generateWithGemini:", error);
-            throw new Error("Failed to generate branded image with Gemini.");
-        }
-    },
+        const logo = new Image();
+        logo.crossOrigin = "Anonymous";
+        logo.onload = () => {
+          // Position logo at bottom right, with some padding
+          const padding = canvas.width * 0.05;
+          const logoWidth = canvas.width * 0.2; // Logo is 20% of image width
+          const logoHeight = (logo.height / logo.width) * logoWidth;
+          const x = canvas.width - logoWidth - padding;
+          const y = canvas.height - logoHeight - padding;
 
-    /**
-     * Generates an image using an OpenRouter model (e.g., Stable Diffusion).
-     */
-    generateWithOpenRouter: async (prompt: string): Promise<string> => {
-        if (!OPENROUTER_API_KEY) throw new Error("OpenRouter API Key is not configured.");
-        try {
-            const response = await fetch("https://openrouter.ai/api/v1/images/generations", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    "model": "stabilityai/stable-diffusion-xl", // Example model
-                    "prompt": `A professional, high-impact social media marketing graphic, vibrant colors, dynamic composition, clean and modern style. Creative brief: "${prompt}"`,
-                    "n": 1,
-                    "size": "1024x1024"
-                })
-            });
+          ctx.globalAlpha = 0.8; // Make logo slightly transparent
+          ctx.drawImage(logo, x, y, logoWidth, logoHeight);
+          ctx.globalAlpha = 1.0;
+          
+          resolve(canvas.toDataURL('image/png'));
+        };
+        logo.onerror = () => resolve(imageUrl); // If logo fails, return original
+        logo.src = logoUrl;
+      };
+      baseImage.onerror = () => reject('Failed to load base image');
+      baseImage.src = imageUrl;
+    });
+  },
 
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`OpenRouter API error: ${response.status} ${errorBody}`);
-            }
-
-            const result = await response.json();
-            const base64Json = result.data[0].b64_json;
-            return `data:image/png;base64,${base64Json}`; // OpenRouter returns base64, add prefix
-
-        } catch (error) {
-            console.error("Error generating with OpenRouter:", error);
-            throw new Error("Failed to generate image with OpenRouter.");
-        }
-    },
-
-    /**
-     * Searches for photos on Unsplash.
-     */
-    searchUnsplash: async (prompt: string): Promise<ImageSearchResult[]> => {
-        if (!UNSPLASH_ACCESS_KEY) throw new Error("Unsplash API Key is not configured.");
-        try {
-            const query = getKeywordsFromPrompt(prompt);
-            const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=20`, {
-                headers: {
-                    'Authorization': `Client-ID ${UNSPLASH_ACCESS_KEY}`
-                }
-            });
-            if (!response.ok) throw new Error(`Unsplash API error: ${response.status}`);
-            const data = await response.json();
-            return data.results.map((img: any) => ({
-                id: img.id,
-                url: img.urls.small,
-                fullUrl: img.urls.regular,
-                alt: img.alt_description,
-                photographer: img.user.name,
-            }));
-        } catch (error) {
-            console.error("Error searching Unsplash:", error);
-            throw new Error("Failed to search Unsplash.");
-        }
-    },
-
-    /**
-     * Searches for photos on Pixabay.
-     */
-    searchPixabay: async (prompt: string): Promise<ImageSearchResult[]> => {
-        if (!PIXABAY_API_KEY) throw new Error("Pixabay API Key is not configured.");
-        try {
-            const query = getKeywordsFromPrompt(prompt);
-            const response = await fetch(`https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(query)}&image_type=photo&per_page=20`);
-            if (!response.ok) throw new Error(`Pixabay API error: ${response.status}`);
-            const data = await response.json();
-            return data.hits.map((img: any) => ({
-                id: img.id.toString(),
-                url: img.webformatURL,
-                fullUrl: img.largeImageURL,
-                alt: img.tags,
-                photographer: img.user,
-            }));
-        } catch (error) {
-            console.error("Error searching Pixabay:", error);
-            throw new Error("Failed to search Pixabay.");
-        }
-    },
-
-    /**
-     * Uses Gemini to brand an image with a logo.
-     * This is an AI-based approach.
-     */
-    brandImage: async(imageBase64: string, logoBase64: string): Promise<string> => {
-         const logoData = logoBase64.split(',')[1] || logoBase64;
-         const editResponse = await geminiAI.models.generateContent({
-            model: 'gemini-2.5-flash-image-preview',
-            contents: {
-                parts: [
-                    { inlineData: { data: imageBase64, mimeType: 'image/jpeg' } },
-                    { inlineData: { data: logoData, mimeType: 'image/png' } },
-                    { text: 'Place the second image (the logo) as a small, professional watermark in the top-right corner of the first image. Ensure it is tastefully sized and does not obscure any important details of the main image.' },
-                ],
-            },
-            config: {
-                responseModalities: [Modality.IMAGE, Modality.TEXT],
-            },
-        });
-
-        const imagePart = editResponse.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        if (imagePart && imagePart.inlineData) {
-            return imagePart.inlineData.data;
-        } else {
-             console.warn("Image editing did not return an image, using unbranded version.");
-             return imageBase64;
-        }
-    },
-
-    /**
-     * Uses HTML Canvas to brand an image with a logo.
-     * This is a deterministic, client-side approach.
-     */
-    brandImageWithCanvas: async (imageUrl: string, logoBase64: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return reject('Could not get canvas context');
-
-            const mainImage = new Image();
-            mainImage.crossOrigin = "Anonymous"; // Important for fetching from other domains
-            mainImage.src = imageUrl;
-
-            mainImage.onload = () => {
-                canvas.width = mainImage.width;
-                canvas.height = mainImage.height;
-                ctx.drawImage(mainImage, 0, 0);
-
-                if(!logoBase64) {
-                    resolve(canvas.toDataURL('image/jpeg', 0.9));
-                    return;
-                }
-
-                const logoImage = new Image();
-                logoImage.src = logoBase64;
-
-                logoImage.onload = () => {
-                    // Calculate logo size (e.g., 15% of the main image width)
-                    const logoWidth = mainImage.width * 0.15;
-                    const logoHeight = (logoImage.height / logoImage.width) * logoWidth;
-                    const padding = mainImage.width * 0.02; // 2% padding
-
-                    // Position in top right corner
-                    const x = mainImage.width - logoWidth - padding;
-                    const y = padding;
-
-                    ctx.globalAlpha = 0.9; // Slightly transparent
-                    ctx.drawImage(logoImage, x, y, logoWidth, logoHeight);
-                    ctx.globalAlpha = 1.0;
-
-                    resolve(canvas.toDataURL('image/jpeg', 0.9));
-                };
-
-                logoImage.onerror = () => reject('Failed to load logo image');
-            };
-
-            mainImage.onerror = () => reject('Failed to load main image');
-        });
-    }
+  /**
+   * "Uploads" an image. In this mock, it just returns the base64 data URL.
+   * A real implementation would upload to a CDN (S3, Cloudinary, etc.) and return a permanent URL.
+   * @param base64Image The base64 encoded image string (can be a data URL).
+   * @returns A promise that resolves with a URL to the image (in this case, the data URL itself).
+   */
+  uploadImage: async (base64Image: string): Promise<string> => {
+      // Simulate upload delay
+      await new Promise(res => setTimeout(res, 500));
+      // In a real app, this would be an API call to your backend/CDN.
+      // For the demo, we just return the data URL which works for display and linking.
+      if (base64Image.startsWith('data:')) {
+          return base64Image;
+      }
+      // Assuming it's just the base64 part
+      return `data:image/png;base64,${base64Image}`;
+  },
 };
