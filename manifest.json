@@ -1,19 +1,15 @@
 {
   "short_name": "دكتور بزنس",
-  "name": "Dr. Business - Automated AI Marketing Platform",
+  "name": "Dr. Business | دكتور بزنس",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/android-chrome-192x192.png",
+      "src": "https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "sizes": "192x192"
+      "purpose": "any maskable"
     },
     {
-      "src": "/android-chrome-512x512.png",
+      "src": "https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png",
       "type": "image/png",
       "sizes": "512x512"
     }

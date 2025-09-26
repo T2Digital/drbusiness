@@ -85,7 +85,7 @@ export const backendService = {
         
         if (client) {
             if (client.status === 'pending') {
-                return { role: 'error', message: 'الحساب قيد المراجعة والتفعيل من قبل الإدارة.' };
+                return { role: 'error', message: 'حسابك لسه بيتراجع. فريقنا هيفعله وهيبعتلك إشعار أول ما يخلص.' };
             }
             if (client.status === 'active') {
                 // In a real app, you would check a hashed password.
@@ -94,7 +94,7 @@ export const backendService = {
             }
         }
 
-        return { role: 'error', message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' };
+        return { role: 'error', message: 'الإيميل أو الباسورد فيهم حاجة غلط. حاول تاني.' };
     },
 
     getClients: async (): Promise<Client[]> => {
@@ -137,6 +137,8 @@ export const backendService = {
         if (clientIndex !== -1) {
             clients[clientIndex].status = 'active';
             saveDb(clients);
+            // Set a flag in local storage for the notification system
+            localStorage.setItem(`client_activated__${clients[clientIndex].email}`, 'true');
             return true;
         }
         return false;

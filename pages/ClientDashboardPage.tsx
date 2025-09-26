@@ -38,15 +38,24 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
     const [generatingWeeks, setGeneratingWeeks] = useState<Set<number>>(new Set());
     const [imageStudioPost, setImageStudioPost] = useState<PostWithStatus | null>(null);
     
+    // FIX: Refactored useEffect to correctly synchronize state with props, preventing an infinite loop and fixing spread operator error.
     useEffect(() => {
-        if (!client.prescription) return;
+        // This effect synchronizes the `posts` state with the `client.prescription` prop.
+        // It rebuilds the posts list from the prop, which is the source of truth,
+        // while preserving local UI state (like `isLoading`) from the previous render.
+        if (!client.prescription) {
+            setPosts([]);
+            return;
+        }
 
-        // FIX: The 'Omit' was incorrectly removing 'generatedImage', which is needed.
-        const allPrescriptionPosts: Omit<PostWithStatus, 'isLoading'>[] = [];
+        type PrescriptionPost = DetailedPost & { id: string; weekKey: string; };
+        const allPrescriptionPosts: PrescriptionPost[] = [];
+
+        // Flatten all posts from the prescription prop
         if (client.prescription.week1Plan) {
             client.prescription.week1Plan.forEach((p, i) => {
                 if (p && typeof p === 'object') {
-                    allPrescriptionPosts.push({ ...p, id: `week1-${i}`, weekKey: 'week1', generatedImage: p.generatedImage });
+                    allPrescriptionPosts.push({ ...p, id: `week1-${i}`, weekKey: 'week1' });
                 }
             });
         }
@@ -55,7 +64,7 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
                 if (Array.isArray(weekPosts)) {
                     weekPosts.forEach((p, i) => {
                         if (p && typeof p === 'object') {
-                             allPrescriptionPosts.push({ ...p, id: `${weekKey}-${i}`, weekKey, generatedImage: p.generatedImage });
+                             allPrescriptionPosts.push({ ...p, id: `${weekKey}-${i}`, weekKey });
                         }
                     });
                 }
@@ -64,37 +73,17 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
 
         setPosts(currentPosts => {
             const currentPostsMap = new Map(currentPosts.map(p => [p.id, p]));
-            const newPostsArray: PostWithStatus[] = [];
-
-            for (const prescriptionPost of allPrescriptionPosts) {
-                const existingPost = currentPostsMap.get(prescriptionPost.id);
-                if (existingPost) {
-                    newPostsArray.push({
-                        ...existingPost, // Keep existing state like isLoading, generatedImage
-                        ...prescriptionPost, // But update content from prescription
-                    });
-                } else {
-                    newPostsArray.push({
-                        ...prescriptionPost,
-                        isLoading: false,
-                        generatedImage: prescriptionPost.generatedImage || undefined,
-                    });
-                }
-            }
-             // Now, update the client data in the background if there are changes
-            const updatedPrescription = { ...client.prescription };
-            newPostsArray.forEach(post => {
-                 const weekKey = post.weekKey;
-                 const postIndex = parseInt(post.id.split('-')[1]);
-                 if (weekKey === 'week1' && updatedPrescription.week1Plan[postIndex]) {
-                     updatedPrescription.week1Plan[postIndex] = post;
-                 } else if (updatedPrescription.detailedPlans?.[weekKey]?.[postIndex]) {
-                     updatedPrescription.detailedPlans[weekKey][postIndex] = post;
-                 }
+            
+            const newPosts = allPrescriptionPosts.map(p => {
+                const existing = currentPostsMap.get(p.id);
+                // Combine fresh data from props with existing UI state
+                return {
+                    ...p, // Base data from prescription
+                    isLoading: existing ? existing.isLoading : false, // Preserve loading state
+                };
             });
-            onUpdateClient({ ...client, prescription: updatedPrescription });
-
-            return newPostsArray.sort((a,b) => a.id.localeCompare(b.id));
+            
+            return newPosts.sort((a, b) => a.id.localeCompare(b.id));
         });
     }, [client.prescription]);
 
@@ -109,7 +98,7 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
             const weekKey = postToUpdate.weekKey;
             const postIndex = parseInt(postToUpdate.id.split('-')[1]);
 
-            if (weekKey === 'week1' && updatedPrescription.week1Plan[postIndex]) {
+            if (weekKey === 'week1' && updatedPrescription.week1Plan?.[postIndex]) {
                 updatedPrescription.week1Plan[postIndex].generatedImage = imageUrl;
             } else if (updatedPrescription.detailedPlans?.[weekKey]?.[postIndex]) {
                 updatedPrescription.detailedPlans[weekKey][postIndex].generatedImage = imageUrl;

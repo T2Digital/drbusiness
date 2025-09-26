@@ -21,7 +21,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
     goals: { awareness: false, sales: false, leads: false, engagement: true, other: '' },
     audience: { description: '' },
   });
-  const [messages, setMessages] = useState<Message[]>([{ sender: 'bot', text: 'أهلاً بك في استشارة دكتور بزنس! لكي أساعدك، أحتاج لمعرفة المزيد عن مشروعك. ما هو اسم البزنس؟' }]);
+  const [messages, setMessages] = useState<Message[]>([{ sender: 'bot', text: 'أهلاً يا وحش! أنا دكتور بزنس، وجاهز أعملك روشتة تسويق تكسر الدنيا. عشان نبدأ، إيه اسم البراند بتاعك؟' }]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -29,13 +29,13 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const questions = [
-    { key: 'business.name', question: 'عظيم! وما هو مجال عملكم؟ (مثال: مطعم، متجر ملابس، تطبيق إلكتروني)' },
-    { key: 'business.description', question: 'رائع. صف لي مشروعك باختصار وبشكل جذاب.' },
-    { key: 'business.location', question: 'في أي منطقة جغرافية ترغب في استهداف عملائك؟' },
-    { key: 'business.website', question: 'هل لديك موقع إلكتروني؟ (يمكنك كتابة "لا يوجد")' },
-    { key: 'business.logo', question: 'هل تود رفع شعار البزنس؟ سيساعدنا في إنشاء تصاميم احترافية.', isLogoUpload: true },
-    { key: 'goals', question: 'ممتاز! ما هي أهم أهدافك التسويقية؟ يمكنك اختيار أكثر من هدف.', options: ['نشر الوعي', 'زيادة المبيعات', 'جذب العملاء', 'زيادة التفاعل'] },
-    { key: 'audience.description', question: 'وأخيراً، صف لي عميلك المثالي بالتفصيل. من هو؟ ما هي اهتماماته؟' },
+    { key: 'business.name', question: 'عاش! طب وإيه مجال البيزنس؟ (قوللي مثلاً: مطعم، براند لبس، تطبيق موبايل)' },
+    { key: 'business.description', question: 'تمام أوي. في سطرين كده، احكيلي قصة البيزنس بتاعك بشكل يشدني.' },
+    { key: 'business.location', question: 'البيزنس بتاعك بيخدم مين وفين؟ (مثلاً: القاهرة كلها، شباب الجامعات في مصر، إلخ)' },
+    { key: 'business.website', question: 'عندك ويبسايت أو صفحة أونلاين؟ ارميلي اللينك. (لو مفيش، اكتب "لسه")' },
+    { key: 'business.logo', question: 'ارفعلي لوجو البراند عشان أظبطلك عليه أحلى شغل. لو مش جاهز، عادي.' , isLogoUpload: true },
+    { key: 'goals', question: 'حلو الكلام. إيه أكتر حاجة نفسك تحققها؟ اختار كل اللي في بالك.', options: ['الناس كلها تعرفني', 'أبيع أكتر وأكسب فلوس', 'أجمع بيانات عملاء مهتمين', 'أعمل قلبان على السوشيال ميديا'] },
+    { key: 'audience.description', question: 'آخر وأهم سؤال: مين هو العميل اللي بتبيعله؟ أوصفهولي كأنك بتكلمني عن صاحبك الانتيم.' },
   ];
 
   useEffect(() => {
@@ -62,7 +62,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
         setTimeout(() => {
              setIsTyping(true);
              setTimeout(() => {
-                addMessage({ sender: 'bot', text: 'شكراً جزيلاً! لقد حصلت على كل المعلومات التي أحتاجها. أنا الآن جاهز لإعداد روشتتك التسويقية المخصصة.', isFinished: true });
+                addMessage({ sender: 'bot', text: 'وحش! كده معايا كل اللي محتاجه. ثواني وهتكون روشتة التسويق الفيروسية بتاعتك جاهزة. استعد للقلقان!', isFinished: true });
                 setIsTyping(false);
              }, 800)
         }, delay);
@@ -89,7 +89,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
   const handleOptionClick = (option: string) => {
     addMessage({ sender: 'user', text: option });
     const goalMap: { [key: string]: keyof MarketingGoals } = {
-        'نشر الوعي': 'awareness', 'زيادة المبيعات': 'sales', 'جذب العملاء': 'leads', 'زيادة التفاعل': 'engagement'
+        'الناس كلها تعرفني': 'awareness', 'أبيع أكتر وأكسب فلوس': 'sales', 'أجمع بيانات عملاء مهتمين': 'leads', 'أعمل قلبان على السوشيال ميديا': 'engagement'
     };
     const goalKey = goalMap[option];
     if (goalKey) {
@@ -103,7 +103,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
   
   const handleGoalsDone = () => {
     const selectedGoals = Object.entries(data.goals).filter(([, val]) => val === true).map(([key]) => key).join(', ');
-    addMessage({sender: 'user', text: `تم اختيار الأهداف: ${selectedGoals || 'لا أهداف محددة'}`});
+    addMessage({sender: 'user', text: `تمام، دي أهدافي.`});
     handleNextQuestion();
   };
 
@@ -112,13 +112,13 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
     if (file) {
       const base64 = await toBase64(file) as string;
       setData(prev => ({ ...prev, business: { ...prev.business, logo: base64 } }));
-      addMessage({ sender: 'user', text: `تم رفع الشعار بنجاح: ${file.name}` });
+      addMessage({ sender: 'user', text: `اللوجو وصل: ${file.name}` });
       handleNextQuestion();
     }
   };
 
   const handleSkipLogo = () => {
-     addMessage({ sender: 'user', text: 'تخطي رفع الشعار' });
+     addMessage({ sender: 'user', text: 'فكك من اللوجو دلوقتي' });
      handleNextQuestion();
   }
   
@@ -126,10 +126,10 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
     <div className="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 bg-slate-900 animate-fade-in">
       <div className="w-full max-w-2xl min-h-[70vh] max-h-[85vh] flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
         <div className="p-4 border-b border-slate-700 flex items-center gap-3">
-          <BrainCircuitIcon className="w-8 h-8 text-teal-400" />
+          <img src="https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png" alt="Logo" className="w-8 h-8"/>
           <div>
             <h2 className="text-xl font-bold text-white">دكتور بزنس</h2>
-            <p className="text-sm text-slate-400">استشارة تسويقية ذكية</p>
+            <p className="text-sm text-slate-400">الاستشارة اللي هتغير البيزنس بتاعك</p>
           </div>
         </div>
         
@@ -137,26 +137,26 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
             {messages.map((msg, index) => (
                 <div key={index} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                     <div className={`w-8 h-8 rounded-full flex-shrink-0 bg-slate-700 flex items-center justify-center`}>
-                        {msg.sender === 'bot' ? <BrainCircuitIcon className="w-5 h-5 text-teal-400" /> : <UserCircle className="w-5 h-5 text-slate-300" />}
+                        {msg.sender === 'bot' ? <img src="https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png" alt="Logo" className="w-5 h-5"/> : <UserCircle className="w-5 h-5 text-slate-300" />}
                     </div>
                     <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'bot' ? 'bg-slate-700 text-slate-200 rounded-bl-none' : 'bg-teal-600 text-white rounded-br-none'}`}>
                        <p className="whitespace-pre-wrap">{msg.text}</p>
                        {msg.options && (
                            <div className="mt-3 space-y-2">
                                {msg.options.map(opt => <button key={opt} onClick={() => handleOptionClick(opt)} className={`w-full text-left p-2 rounded-md transition ${data.goals[goalMap[opt] as keyof MarketingGoals] ? 'bg-teal-700' : 'bg-slate-600 hover:bg-slate-500'}`}>{opt}</button>)}
-                               <button onClick={handleGoalsDone} className="w-full p-2 rounded-md bg-blue-600 hover:bg-blue-500 transition font-bold mt-2">تم</button>
+                               <button onClick={handleGoalsDone} className="w-full p-2 rounded-md bg-blue-600 hover:bg-blue-500 transition font-bold mt-2">تمام كده</button>
                            </div>
                        )}
                        {msg.isLogoUpload && (
                            <div className="mt-3 flex gap-2">
-                                <button onClick={() => fileInputRef.current?.click()} className="flex-1 p-2 rounded-md bg-slate-600 hover:bg-slate-500 transition">رفع الشعار</button>
-                                <button onClick={handleSkipLogo} className="flex-1 p-2 rounded-md bg-slate-800 hover:bg-slate-700 transition">تخطي</button>
+                                <button onClick={() => fileInputRef.current?.click()} className="flex-1 p-2 rounded-md bg-slate-600 hover:bg-slate-500 transition">ارفع اللوجو</button>
+                                <button onClick={handleSkipLogo} className="flex-1 p-2 rounded-md bg-slate-800 hover:bg-slate-700 transition">عديها</button>
                                 <input ref={fileInputRef} type="file" className="sr-only" accept="image/*" onChange={handleLogoChange}/>
                            </div>
                        )}
                        {msg.isFinished && (
                            <div className="mt-3">
-                               <button onClick={() => onSubmit(data)} className="w-full p-3 rounded-md bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 transition font-bold">🚀 احصل على الروشتة الآن</button>
+                               <button onClick={() => onSubmit(data)} className="w-full p-3 rounded-md bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 transition font-bold">🔥 وريني الروشتة حالا</button>
                            </div>
                        )}
                     </div>
@@ -165,7 +165,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
              {isTyping && (
                 <div className="flex items-end gap-2">
                     <div className="w-8 h-8 rounded-full flex-shrink-0 bg-slate-700 flex items-center justify-center">
-                        <BrainCircuitIcon className="w-5 h-5 text-teal-400" />
+                        <img src="https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png" alt="Logo" className="w-5 h-5"/>
                     </div>
                     <div className="max-w-md p-3 rounded-lg bg-slate-700 rounded-bl-none">
                        <div className="flex items-center gap-1">
@@ -182,8 +182,8 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
         <div className="p-4 border-t border-slate-700">
              {currentQuestion < questions.length && questions[currentQuestion] && !questions[currentQuestion].options && !questions[currentQuestion].isLogoUpload && (
                 <div className="flex gap-2">
-                    <input type="text" value={inputValue} onChange={handleInputChange} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder="اكتب إجابتك هنا..." className="flex-1 p-3 bg-slate-700 rounded-full border border-slate-600 focus:ring-2 focus:ring-teal-400 focus:outline-none" />
-                    <button onClick={handleSend} className="bg-teal-500 text-white font-bold p-3 rounded-full hover:bg-teal-600 transition disabled:opacity-50" disabled={!inputValue.trim()}>إرسال</button>
+                    <input type="text" value={inputValue} onChange={handleInputChange} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder="اكتب ردك هنا..." className="flex-1 p-3 bg-slate-700 rounded-full border border-slate-600 focus:ring-2 focus:ring-teal-400 focus:outline-none" />
+                    <button onClick={handleSend} className="bg-teal-500 text-white font-bold p-3 rounded-full hover:bg-teal-600 transition disabled:opacity-50" disabled={!inputValue.trim()}>ابعت</button>
                 </div>
              )}
         </div>
@@ -191,7 +191,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
     </div>
   );
 };
-const goalMap: { [key: string]: string } = { 'نشر الوعي': 'awareness', 'زيادة المبيعات': 'sales', 'جذب العملاء': 'leads', 'زيادة التفاعل': 'engagement' };
+const goalMap: { [key: string]: string } = { 'الناس كلها تعرفني': 'awareness', 'أبيع أكتر وأكسب فلوس': 'sales', 'أجمع بيانات عملاء مهتمين': 'leads', 'أعمل قلبان على السوشيال ميديا': 'engagement' };
 
 
 export default ConsultationPage;

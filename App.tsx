@@ -15,7 +15,7 @@ import { ConsultationData, Prescription, Package, Client, RegistrationDetails } 
 import { generatePrescription } from './services/geminiService';
 import { backendService, LoginResult } from './services/backendService';
 import { generateWhatsAppLink } from './utils/helpers';
-import { LoadingSpinner, DownloadIcon } from './components/icons';
+import { LoadingSpinner } from './components/icons';
 
 type AppState = 'landing' | 'consultation' | 'analysis' | 'prescription' | 'pricing' | 'registration' | 'payment' | 'pending_activation' | 'client_dashboard' | 'login' | 'admin_dashboard' | 'video_generator';
 
@@ -66,19 +66,31 @@ function App() {
     };
   }, []);
 
-  const handleInstallClick = () => {
-    if (installPromptEvent) {
-      installPromptEvent.prompt();
-      installPromptEvent.userChoice.then(choiceResult => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the A2HS prompt');
-        } else {
-          console.log('User dismissed the A2HS prompt');
-        }
-        setInstallPromptEvent(null);
-      });
+  useEffect(() => {
+    // Automatically trigger the install prompt on the landing page
+    if (page === 'landing' && installPromptEvent) {
+        installPromptEvent.prompt();
+        installPromptEvent.userChoice.then(() => {
+            setInstallPromptEvent(null);
+        });
     }
-  };
+  }, [page, installPromptEvent]);
+  
+  // Notification for activated account
+  useEffect(() => {
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('client_activated_') && localStorage.getItem(key) === 'true') {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const clientEmail = key.split('__')[1];
+                 new Notification('تم تفعيل حسابك في دكتور بزنس!', {
+                    body: `أهلاً بك! حسابك (${clientEmail}) جاهز الآن. يلا بينا نسجل دخول ونشوف خطة التسويق الجديدة.`,
+                    icon: 'https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png'
+                });
+            }
+            localStorage.removeItem(key); // Clear the flag
+        }
+    });
+  }, []);
 
 
   // Initial check for a session (e.g., from a cookie or localStorage in a real app)
@@ -126,9 +138,9 @@ function App() {
       setPage('prescription');
     } catch (err) {
         if (err instanceof Error) {
-            setError(`حدث خطأ أثناء إنشاء الروشتة: ${err.message}. يرجى المحاولة مرة أخرى.`);
+            setError(`حدث خطأ فني أثناء إعداد الروشتة: ${err.message}. فريقنا يعمل على إصلاحه. جرب مرة تانية.`);
         } else {
-            setError('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
+            setError('حدث خطأ فني غير متوقع. جرب مرة تانية.');
         }
         setPage('prescription');
     }
@@ -153,7 +165,6 @@ function App() {
               prescription,
               selectedPackage,
               email: registrationDetails.email,
-              // FIX: Added missing 'connections' property to match the 'Omit<Client, "id" | "status">' type required by generateWhatsAppLink.
               connections: { facebook: false, instagram: false, tiktok: false, x: false, linkedin: false },
           };
           
@@ -165,7 +176,7 @@ function App() {
           setPage('pending_activation');
       } else {
           // Handle error case where data is missing
-          alert("حدث خطأ ما. الرجاء البدء من جديد.");
+          alert("فيه بيانات ناقصة. هنبدأ من الأول عشان نتأكد إن كل حاجة تمام.");
           handleStart();
       }
   };
@@ -256,7 +267,7 @@ function App() {
       case 'payment':
         return <PaymentPage selectedPackage={selectedPackage} onPaymentConfirm={handlePaymentConfirm} />;
       case 'pending_activation':
-        return <PendingActivationPage />;
+        return <PendingActivationPage onBackToHome={() => setPage('landing')} />;
       default:
         return <LandingPage onStart={handleStart} onLogin={handleGoToLogin} onAdmin={handleGoToLogin} />;
     }
@@ -264,17 +275,6 @@ function App() {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen">
-      {installPromptEvent && (
-         <div className="fixed bottom-4 right-4 z-50">
-           <button
-             onClick={handleInstallClick}
-             className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 animate-fade-in"
-           >
-             <DownloadIcon className="w-5 h-5" />
-             <span>تثبيت التطبيق</span>
-           </button>
-         </div>
-      )}
       {renderPage()}
     </div>
   );

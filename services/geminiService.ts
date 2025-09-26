@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ConsultationData, Prescription, SimplePost, DetailedPost, AnalyticsData } from '../types';
+import { imageService } from './imageService';
 
 // FIX: Hardcoded API key to resolve Vercel deployment issues.
 const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
@@ -76,11 +77,11 @@ export const generatePrescription = async (data: ConsultationData): Promise<Pres
     Target Audience: ${data.audience.description}
 
     The prescription should include:
-    1.  A catchy strategy title and summary with 3-4 actionable steps.
-    2.  A detailed content plan for the first week (Week 1), with 4-5 posts. For each post, provide the day, platform (e.g., Instagram, Facebook), post type (e.g., engaging question, behind the scenes, product showcase), a full caption, relevant hashtags, and a detailed visual prompt in English for an AI image generator.
-    3.  A plan for the next three weeks (Weeks 2, 3, 4) with a summary for each week and simple post ideas (day, platform, idea) for each day of the week.
+    1.  A very catchy, powerful, and viral strategy title, a summary, and 3-4 actionable steps.
+    2.  A detailed content plan for the first week (Week 1), with 4-5 posts. For each post, provide: day, platform (e.g., Instagram, Facebook), post type (e.g., engaging question, behind the scenes, product showcase), a full viral-style caption, relevant hashtags, and a detailed visual prompt in English for an AI image generator.
+    3.  A plan for the next three weeks (Weeks 2, 3, 4) with a summary for each week and simple, strong post ideas (day, platform, idea) for each day of the week.
 
-    Respond ONLY with the JSON object. The language for the content (captions, strategy, ideas) should be in Arabic. Visual prompts must be in English.
+    Respond ONLY with the JSON object. The language for the content (captions, strategy, ideas) should be in colloquial Egyptian Arabic. Visual prompts must be in English.
     `;
 
     const response = await ai.models.generateContent({
@@ -93,8 +94,33 @@ export const generatePrescription = async (data: ConsultationData): Promise<Pres
     });
 
     const jsonString = response.text;
-    return JSON.parse(jsonString) as Prescription;
+    const prescription = JSON.parse(jsonString) as Prescription;
+    
+    // --- NEW: Auto-generate images for week 1 ---
+    if (prescription.week1Plan && prescription.week1Plan.length > 0) {
+        console.log("Starting automatic image generation for Week 1...");
+        const enhancedPosts = await Promise.all(
+            prescription.week1Plan.map(async (post) => {
+                try {
+                    console.log(`Generating image for prompt: "${post.visualPrompt}"`);
+                    const imageBase64 = await imageService.generateWithGemini(post.visualPrompt);
+                    console.log(`Uploading image for post: "${post.caption}"`);
+                    const imageUrl = await imageService.uploadImage(imageBase64);
+                    console.log(`Image ready for post: "${post.caption}" at ${imageUrl}`);
+                    return { ...post, generatedImage: imageUrl };
+                } catch (error) {
+                    console.error(`Failed to generate or upload image for post: ${post.caption}`, error);
+                    return { ...post, generatedImage: undefined }; // Return post without image on failure
+                }
+            })
+        );
+        prescription.week1Plan = enhancedPosts;
+        console.log("Finished automatic image generation.");
+    }
+
+    return prescription;
 };
+
 
 export const generateDetailedWeekPlan = async (consultationData: ConsultationData, simplePosts: SimplePost[]): Promise<DetailedPost[]> => {
     const prompt = `
@@ -103,7 +129,7 @@ export const generateDetailedWeekPlan = async (consultationData: ConsultationDat
         - Field: ${consultationData.business.field}
         - Audience: ${consultationData.audience.description}
 
-        Task: Convert the following simple post ideas into a detailed content plan. For each post, generate a full caption in Arabic, relevant hashtags in Arabic, a post type, and a detailed visual prompt in English for an AI image generator.
+        Task: Convert the following simple post ideas into a detailed content plan. For each post, generate a full, viral-style caption in colloquial Egyptian Arabic, relevant hashtags in Arabic, a post type, and a detailed visual prompt in English for an AI image generator.
 
         Simple Post Ideas:
         ${simplePosts.map(p => `- ${p.day}, ${p.platform}: ${p.idea}`).join('\n')}
@@ -132,7 +158,7 @@ export const generateCaptionVariations = async (originalCaption: string, busines
         Business Context: ${businessContext}
         Original Caption: "${originalCaption}"
 
-        Generate 3 alternative versions of this caption. They should be different in tone or angle but convey a similar message. Respond in Arabic.
+        Generate 3 alternative versions of this caption. They should be different in tone or angle but convey a similar message. Respond in colloquial Egyptian Arabic.
         Respond ONLY with a JSON array of strings.
     `;
     const response = await ai.models.generateContent({
@@ -155,7 +181,7 @@ export const elaborateOnStrategyStep = async (businessContext: string, step: str
         Business Context: ${businessContext}
         Strategy Step: "${step}"
 
-        Elaborate on this marketing strategy step. Provide a 2-3 paragraph explanation of why it's important and how to execute it effectively. Use markdown for formatting. Respond in Arabic.
+        Elaborate on this marketing strategy step. Provide a 2-3 paragraph explanation of why it's important and how to execute it effectively. Use markdown for formatting. Respond in colloquial Egyptian Arabic.
     `;
 
     const response = await ai.models.generateContent({ model, contents: prompt });

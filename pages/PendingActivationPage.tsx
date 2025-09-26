@@ -1,6 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
-const PendingActivationPage: React.FC = () => {
+interface PendingActivationPageProps {
+    onBackToHome: () => void;
+}
+
+const PendingActivationPage: React.FC<PendingActivationPageProps> = ({ onBackToHome }) => {
+    
+    useEffect(() => {
+        // Request notification permission so the user can be notified upon activation
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
+    }, []);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-slate-900 animate-fade-in">
       <div className="w-full max-w-2xl bg-slate-800 rounded-2xl shadow-2xl p-12 border border-slate-700">
@@ -11,14 +23,14 @@ const PendingActivationPage: React.FC = () => {
           </svg>
         </div>
         <h1 className="text-4xl font-extrabold text-white mb-4">
-          تم استلام طلبك بنجاح!
+          وصل يا بطل! طلبك بيترفع
         </h1>
         <p className="text-lg text-slate-400 mb-8">
-          حسابك الآن قيد المراجعة والتفعيل من قبل الإدارة. سيتم إعلامك فور تفعيل الباقة ويمكنك بعدها تسجيل الدخول إلى لوحة التحكم الخاصة بك.
+          فريقنا بيراجع بياناتك دلوقتي، وأول ما حسابك يتفعّل هنبعتلك إشعار عشان تبدأ رحلة النجاح. الموضوع مش هياخد وقت.
         </p>
-        <p className="text-sm text-slate-500">
-          يمكنك إغلاق هذه الصفحة بأمان الآن.
-        </p>
+        <button onClick={onBackToHome} className="bg-slate-700 text-white font-bold py-3 px-8 rounded-full hover:bg-slate-600 transition">
+          العودة للرئيسية
+        </button>
       </div>
     </div>
   );

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Prescription, ConsultationData, DetailedPost } from '../types';
-import { LoadingSpinner, DownloadIcon, CopyIcon, BrainCircuitIcon, Wand2Icon } from '../components/icons';
-import { ImageStudioModal } from '../components/ImageStudioModal';
-import { Client } from '../types';
+import { LoadingSpinner, DownloadIcon, CopyIcon } from '../components/icons';
 
 interface PrescriptionPageProps {
   prescription: Prescription | null;
@@ -11,60 +9,24 @@ interface PrescriptionPageProps {
   error: string | null;
 }
 
-type PostWithStatus = DetailedPost & {
-  id: number;
-  isLoading: boolean;
-  generatedImage?: string;
-};
-
-const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consultationData, onProceed, error }) => {
-    const [posts, setPosts] = useState<PostWithStatus[]>([]);
-    const [copiedPostId, setCopiedPostId] = useState<number | null>(null);
+const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onProceed, error }) => {
+    const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('week1');
-    const [imageStudioPost, setImageStudioPost] = useState<PostWithStatus | null>(null);
 
-    // Create a mock client object for the ImageStudioModal
-    const mockClient: Client | null = consultationData ? {
-        id: 0,
-        consultationData: consultationData,
-        prescription: prescription!,
-        selectedPackage: { name: 'Sample', price: 0, features: [], postsPerMonth: 7, videosPerMonth: 0, isFeatured: false },
-        connections: { facebook: false, instagram: false, tiktok: false, x: false, linkedin: false },
-        email: 'preview@example.com',
-        status: 'active',
-    } : null;
-
-    useEffect(() => {
-        if (prescription?.week1Plan) {
-            const initialPosts = prescription.week1Plan.map((p, i) => ({ 
-                ...p, 
-                id: i, 
-                isLoading: false,
-                generatedImage: undefined 
-            }));
-            setPosts(initialPosts);
-        }
-    }, [prescription]);
-
-    const handleImageSave = (postId: number, imageUrl: string) => {
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, generatedImage: imageUrl, isLoading: false } : p));
-        setImageStudioPost(null);
-    };
-
-    const handleCopy = (post: PostWithStatus) => {
+    const handleCopy = (post: DetailedPost, index: number) => {
         const textToCopy = `${post.caption}\n\n${post.hashtags}`;
         navigator.clipboard.writeText(textToCopy);
-        setCopiedPostId(post.id);
+        setCopiedPostId(`week1-${index}`);
         setTimeout(() => setCopiedPostId(null), 2000);
     };
 
     if (error) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
-          <h2 className="text-3xl font-bold text-red-400 mb-4">حدث خطأ</h2>
+          <h2 className="text-3xl font-bold text-red-400 mb-4">أوبس! حصلت مشكلة</h2>
           <p className="text-slate-400 max-w-lg">{error}</p>
           <button onClick={() => window.location.reload()} className="mt-8 bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-2 px-6 rounded-full hover:from-teal-600 hover:to-blue-700 transition">
-            حاول مرة أخرى
+            جرب تاني
           </button>
         </div>
       )
@@ -80,10 +42,10 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
             <div className="max-w-7xl mx-auto">
                 <header className="text-center mb-12">
                     <h1 className="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-blue-500">
-                        روشتة التسويق بتاعتك
+                        روشتة التسويق الفيروسية بتاعتك
                     </h1>
                     <p className="mt-4 text-lg text-slate-400">
-                        خطة شهرية متكاملة وجاهزة للنشر من دكتور بزنس.
+                        خطة شهرية متكاملة، جاهزة للتنفيذ عشان تكسر الدنيا.
                     </p>
                 </header>
 
@@ -104,7 +66,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                     <h2 className="text-3xl font-bold text-center mb-8 text-white">خطة المحتوى الشهرية</h2>
                     <div className="border-b border-slate-700 mb-6">
                         <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
-                            <button onClick={() => setActiveTab('week1')} className={`${activeTab === 'week1' ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع الأول (عينة)</button>
+                            <button onClick={() => setActiveTab('week1')} className={`${activeTab === 'week1' ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع الأول (جاهز بالنشر)</button>
                             {prescription.futureWeeksPlan.map(week => (
                                 <button key={week.week} onClick={() => setActiveTab(`week${week.week}`)} className={`${activeTab === `week${week.week}` ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع {week.week}</button>
                             ))}
@@ -114,19 +76,15 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                     <div>
                         {activeTab === 'week1' && (
                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {posts.map((post) => (
-                                    <div key={post.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
+                                {prescription.week1Plan.map((post, index) => (
+                                    <div key={index} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
                                         <div className="aspect-square bg-slate-700 flex items-center justify-center">
-                                            {post.isLoading ? <LoadingSpinner className="w-10 h-10 text-slate-500" />
-                                            : post.generatedImage ? <img src={post.generatedImage} alt={post.visualPrompt} className="w-full h-full object-cover"/>
-                                            : (
-                                                <div className="text-center p-4">
-                                                    <button onClick={() => setImageStudioPost(post)} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-500 transition flex items-center gap-2">
-                                                        <Wand2Icon className="w-5 h-5"/>
-                                                        إنشاء تصميم
-                                                    </button>
+                                            {post.generatedImage ? 
+                                                <img src={post.generatedImage} alt={post.visualPrompt} className="w-full h-full object-cover"/>
+                                                : 
+                                                <div className="text-center p-4 text-yellow-400">
+                                                    <p>لم نتمكن من توليد صورة. يمكنك إنشائها من لوحة التحكم لاحقًا.</p>
                                                 </div>
-                                            )
                                             }
                                         </div>
                                         <div className="p-4 flex flex-col flex-grow">
@@ -137,10 +95,10 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                                             <p className="text-slate-400 text-sm mb-3 h-24 overflow-y-auto p-2 bg-slate-900/50 rounded-md whitespace-pre-wrap">{post.caption}</p>
                                             <p className="text-slate-500 text-xs mb-4 h-12 overflow-y-auto">{post.hashtags}</p>
                                             <div className="mt-auto grid grid-cols-2 gap-2">
-                                                <button onClick={() => handleCopy(post)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white font-bold py-2 px-3 rounded-md hover:bg-slate-600 transition">
-                                                    <CopyIcon className="w-4 h-4" /> {copiedPostId === post.id ? 'تم النسخ!' : 'نسخ النص'}
+                                                <button onClick={() => handleCopy(post, index)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white font-bold py-2 px-3 rounded-md hover:bg-slate-600 transition">
+                                                    <CopyIcon className="w-4 h-4" /> {copiedPostId === `week1-${index}` ? 'اتنسخ!' : 'انسخ المحتوى'}
                                                 </button>
-                                                <a href={post.generatedImage} download={`${consultationData?.business.name || 'post'}-${post.day}.jpg`} className={`flex items-center justify-center gap-2 w-full text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition ${!post.generatedImage ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                                <a href={post.generatedImage} download={`drbusiness-post-${index}.png`} className={`flex items-center justify-center gap-2 w-full text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition ${!post.generatedImage ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                                     <DownloadIcon className="w-4 h-4" /> تحميل الصورة
                                                 </a>
                                             </div>
@@ -176,19 +134,11 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                         onClick={onProceed}
                         className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-4 px-10 rounded-full hover:from-teal-600 hover:to-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-teal-400 transition-all duration-300 transform hover:scale-110 text-lg shadow-2xl shadow-teal-500/20"
                     >
-                        الخطوة الجاية: اختار باقتك
+                        الخطوة الجاية: اختار باقتك وولعها
                     </button>
                 </footer>
             </div>
         </div>
-        {imageStudioPost && mockClient && (
-            <ImageStudioModal
-                post={{...imageStudioPost, id: `week1-${imageStudioPost.id}`, weekKey: 'week1'}}
-                client={mockClient}
-                onClose={() => setImageStudioPost(null)}
-                onSave={(_, imageUrl) => handleImageSave(imageStudioPost.id, imageUrl)}
-            />
-        )}
         </>
     );
 };
