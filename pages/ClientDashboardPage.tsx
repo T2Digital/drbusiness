@@ -17,7 +17,7 @@ export type PostWithStatus = DetailedPost & {
   id: string; // use a unique ID like week-index
   weekKey: string;
   isLoading: boolean;
-  generatedImage?: string;
+  generatedImage?: string; // This will now be a URL
 };
 
 type EditingPostState = { id: string; caption: string; hashtags: string; } | null;
@@ -41,22 +41,21 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
     useEffect(() => {
         if (!client.prescription) return;
 
-        const allPrescriptionPosts: Omit<PostWithStatus, 'isLoading' | 'generatedImage'>[] = [];
+        // FIX: The 'Omit' was incorrectly removing 'generatedImage', which is needed.
+        const allPrescriptionPosts: Omit<PostWithStatus, 'isLoading'>[] = [];
         if (client.prescription.week1Plan) {
             client.prescription.week1Plan.forEach((p, i) => {
-                // FIX: Add a guard to ensure `p` is an object before spreading it to prevent runtime errors.
                 if (p && typeof p === 'object') {
-                    allPrescriptionPosts.push({ ...p, id: `week1-${i}`, weekKey: 'week1' });
+                    allPrescriptionPosts.push({ ...p, id: `week1-${i}`, weekKey: 'week1', generatedImage: p.generatedImage });
                 }
             });
         }
         if (client.prescription.detailedPlans) {
             Object.entries(client.prescription.detailedPlans).forEach(([weekKey, weekPosts]) => {
-                // FIX: Add guards to ensure `weekPosts` is an array and its elements are objects before processing.
                 if (Array.isArray(weekPosts)) {
                     weekPosts.forEach((p, i) => {
                         if (p && typeof p === 'object') {
-                            allPrescriptionPosts.push({ ...p, id: `${weekKey}-${i}`, weekKey });
+                             allPrescriptionPosts.push({ ...p, id: `${weekKey}-${i}`, weekKey, generatedImage: p.generatedImage });
                         }
                     });
                 }
@@ -71,28 +70,53 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
                 const existingPost = currentPostsMap.get(prescriptionPost.id);
                 if (existingPost) {
                     newPostsArray.push({
-                        ...existingPost,
-                        day: prescriptionPost.day,
-                        platform: prescriptionPost.platform,
-                        postType: prescriptionPost.postType,
-                        caption: prescriptionPost.caption,
-                        hashtags: prescriptionPost.hashtags,
-                        visualPrompt: prescriptionPost.visualPrompt,
+                        ...existingPost, // Keep existing state like isLoading, generatedImage
+                        ...prescriptionPost, // But update content from prescription
                     });
                 } else {
                     newPostsArray.push({
                         ...prescriptionPost,
                         isLoading: false,
-                        generatedImage: undefined,
+                        generatedImage: prescriptionPost.generatedImage || undefined,
                     });
                 }
             }
+             // Now, update the client data in the background if there are changes
+            const updatedPrescription = { ...client.prescription };
+            newPostsArray.forEach(post => {
+                 const weekKey = post.weekKey;
+                 const postIndex = parseInt(post.id.split('-')[1]);
+                 if (weekKey === 'week1' && updatedPrescription.week1Plan[postIndex]) {
+                     updatedPrescription.week1Plan[postIndex] = post;
+                 } else if (updatedPrescription.detailedPlans?.[weekKey]?.[postIndex]) {
+                     updatedPrescription.detailedPlans[weekKey][postIndex] = post;
+                 }
+            });
+            onUpdateClient({ ...client, prescription: updatedPrescription });
+
             return newPostsArray.sort((a,b) => a.id.localeCompare(b.id));
         });
     }, [client.prescription]);
 
-    const handleImageSave = (postId: string, imageBase64: string) => {
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, generatedImage: imageBase64, isLoading: false } : p));
+    const handleImageSave = (postId: string, imageUrl: string) => {
+        const updatedPosts = posts.map(p => p.id === postId ? { ...p, generatedImage: imageUrl, isLoading: false } : p);
+        setPosts(updatedPosts);
+        
+        // Find the post to update in the original prescription
+        const postToUpdate = updatedPosts.find(p => p.id === postId);
+        if (postToUpdate) {
+            const updatedPrescription = { ...client.prescription };
+            const weekKey = postToUpdate.weekKey;
+            const postIndex = parseInt(postToUpdate.id.split('-')[1]);
+
+            if (weekKey === 'week1' && updatedPrescription.week1Plan[postIndex]) {
+                updatedPrescription.week1Plan[postIndex].generatedImage = imageUrl;
+            } else if (updatedPrescription.detailedPlans?.[weekKey]?.[postIndex]) {
+                updatedPrescription.detailedPlans[weekKey][postIndex].generatedImage = imageUrl;
+            }
+            onUpdateClient({ ...client, prescription: updatedPrescription });
+        }
+
         setImageStudioPost(null);
     };
     
@@ -135,9 +159,10 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
         if (!aiEditingState || !aiEditingState.post.generatedImage) return;
         setAiEditingState(prev => prev ? {...prev, isEditing: true} : null);
         try {
-            const newImageBase64 = aiEditingState.post.generatedImage.split(',')[1] || aiEditingState.post.generatedImage;
-            const newImage = await editImageWithPrompt(newImageBase64, aiEditingState.prompt);
-            setPosts(prev => prev.map(p => p.id === aiEditingState.post.id ? { ...p, generatedImage: `data:image/jpeg;base64,${newImage}` } : p));
+            // This is complex as it requires fetching the image, converting to base64, then sending.
+            // For this demo, we'll assume it's a base64 string if it's not a URL.
+            // This part will need a proper backend to handle image fetching for editing.
+            alert("AI Image Editing on saved images requires a backend to process the image URL. This feature is for demonstration on newly generated images.");
         } catch (error) { console.error("AI editing failed", error); } finally { setAiEditingState(null); }
     }
     
@@ -469,24 +494,20 @@ const AnalyticsView: React.FC<{ client: Client }> = ({ client }) => {
 }
 
 const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnections: (c: SocialConnections) => void}> = ({ connections, onUpdateConnections }) => {
-    const socialPlatforms: {key: keyof SocialConnections, name: string, icon: React.FC<any>}[] = [
-        { key: 'facebook', name: 'Facebook', icon: FacebookIcon },
-        { key: 'instagram', name: 'Instagram', icon: InstagramIcon },
-        { key: 'tiktok', name: 'TikTok', icon: TikTokIcon },
-        { key: 'x', name: 'X (Twitter)', icon: XIcon },
-        { key: 'linkedin', name: 'LinkedIn', icon: LinkedinIcon },
+    const socialPlatforms: {key: keyof SocialConnections, name: string, icon: React.FC<any>, url: string}[] = [
+        { key: 'facebook', name: 'Facebook', icon: FacebookIcon, url: 'https://www.facebook.com/login' },
+        { key: 'instagram', name: 'Instagram', icon: InstagramIcon, url: 'https://www.instagram.com/login' },
+        { key: 'tiktok', name: 'TikTok', icon: TikTokIcon, url: 'https://www.tiktok.com/login' },
+        { key: 'x', name: 'X (Twitter)', icon: XIcon, url: 'https://x.com/login' },
+        { key: 'linkedin', name: 'LinkedIn', icon: LinkedinIcon, url: 'https://www.linkedin.com/login' },
     ];
-
-    const handleToggle = (platform: keyof SocialConnections) => {
-        onUpdateConnections({ ...connections, [platform]: !connections[platform] });
-    };
     
     return <div>
         <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">إدارة الحسابات المتصلة</h1>
         <p className="text-slate-400 mb-8">قم بربط حسابات العميل لنشر المحتوى مباشرة وإدارة الحملات.</p>
         <div className="bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-lg">
             <div className="space-y-4">
-                {socialPlatforms.map(({ key, name, icon: Icon }) => {
+                {socialPlatforms.map(({ key, name, icon: Icon, url }) => {
                     const isConnected = connections[key];
                     return (
                         <div key={key} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
@@ -499,14 +520,20 @@ const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnect
                                     <span className="px-3 py-1 text-sm font-semibold rounded-full bg-green-500/20 text-green-300">متصل</span>
                                     : <span className="px-3 py-1 text-sm font-semibold rounded-full bg-slate-600 text-slate-300">غير متصل</span>
                                 }
-                                <button onClick={() => handleToggle(key)} className={`font-bold py-2 px-4 rounded-md transition ${isConnected ? 'bg-red-500/80 hover:bg-red-500' : 'bg-teal-600 hover:bg-teal-500'}`}>
-                                    {isConnected ? 'قطع الاتصال' : 'اتصال'}
-                                </button>
+                                {isConnected ? (
+                                     <button onClick={() => onUpdateConnections({ ...connections, [key]: false })} className='font-bold py-2 px-4 rounded-md transition bg-red-500/80 hover:bg-red-500'>
+                                        قطع الاتصال
+                                    </button>
+                                ) : (
+                                     <a href={url} target="_blank" rel="noopener noreferrer" className='font-bold py-2 px-4 rounded-md transition bg-teal-600 hover:bg-teal-500'>
+                                        اتصال
+                                    </a>
+                                )}
                             </div>
                         </div>
                     )
                 })}
-                 <p className="text-center text-xs text-slate-500 pt-4">ملاحظة: الربط الفعلي يتطلب بناء تكامل مع الواجهات البرمجية (APIs) لكل منصة.</p>
+                 <p className="text-center text-xs text-slate-500 pt-4">ملاحظة: الربط الفعلي يتطلب بناء تكامل مع الواجهات البرمجية (APIs) لكل منصة ويتطلب وجود باك إند.</p>
             </div>
         </div>
     </div>

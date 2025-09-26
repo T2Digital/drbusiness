@@ -2,14 +2,12 @@ import React, { useState, useRef } from 'react';
 import { CreditCard, Upload, LoadingSpinner } from '../components/icons';
 import { Package } from '../types';
 import { toBase64 } from '../utils/helpers';
+import { imageService } from '../services/imageService';
 
 interface PaymentPageProps {
   selectedPackage: Package | null;
   onPaymentConfirm: (proofImageUrl: string) => void;
 }
-
-// FIX: Hardcoded the API key to resolve runtime errors on Vercel where import.meta.env is unavailable.
-const IMG_BB_API_KEY = 'bde613bd4475de5e00274a795091ba04';
 
 const PaymentPage: React.FC<PaymentPageProps> = ({ selectedPackage, onPaymentConfirm }) => {
   const [proof, setProof] = useState<File | null>(null);
@@ -32,30 +30,13 @@ const PaymentPage: React.FC<PaymentPageProps> = ({ selectedPackage, onPaymentCon
     setUploadError(null);
     
     try {
-        if (!IMG_BB_API_KEY) {
-            throw new Error("ImgBB API key is not configured.");
-        }
         const base64Image = await toBase64(proof) as string;
-        const formData = new FormData();
-        // The API requires the base64 string without the data URL prefix (e.g., "data:image/png;base64,")
-        formData.append('image', base64Image.split(',')[1]);
-
-        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_API_KEY}`, {
-            method: 'POST',
-            body: formData,
-        });
-
-        const result = await response.json();
-
-        if (result.success && result.data.url) {
-            onPaymentConfirm(result.data.url);
-        } else {
-            throw new Error(result.error?.message || 'Failed to upload image due to an unknown error.');
-        }
-
+        const imageUrl = await imageService.uploadImage(base64Image);
+        onPaymentConfirm(imageUrl);
     } catch (error) {
         console.error('Upload failed:', error);
-        setUploadError('فشل رفع صورة الإثبات. يرجى المحاولة مرة أخرى.');
+        setUploadError(error instanceof Error ? error.message : 'فشل رفع صورة الإثبات. يرجى المحاولة مرة أخرى.');
+    } finally {
         setIsUploading(false);
     }
   };

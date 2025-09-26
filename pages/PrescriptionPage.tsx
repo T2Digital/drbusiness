@@ -46,8 +46,8 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
         }
     }, [prescription]);
 
-    const handleImageSave = (postId: number, imageBase64: string) => {
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, generatedImage: imageBase64, isLoading: false } : p));
+    const handleImageSave = (postId: number, imageUrl: string) => {
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, generatedImage: imageUrl, isLoading: false } : p));
         setImageStudioPost(null);
     };
 
@@ -102,8 +102,8 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
 
                 <section className="mb-12">
                     <h2 className="text-3xl font-bold text-center mb-8 text-white">خطة المحتوى الشهرية</h2>
-                    <div className="border-b border-slate-700 mb-6 overflow-x-auto">
-                        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                    <div className="border-b border-slate-700 mb-6">
+                        <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
                             <button onClick={() => setActiveTab('week1')} className={`${activeTab === 'week1' ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع الأول (عينة)</button>
                             {prescription.futureWeeksPlan.map(week => (
                                 <button key={week.week} onClick={() => setActiveTab(`week${week.week}`)} className={`${activeTab === `week${week.week}` ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع {week.week}</button>
@@ -183,13 +183,10 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
         </div>
         {imageStudioPost && mockClient && (
             <ImageStudioModal
-                // We pass a post with a string ID as the component expects
-                // FIX: Added missing 'weekKey' property to satisfy the PostWithStatus type required by ImageStudioModal.
                 post={{...imageStudioPost, id: `week1-${imageStudioPost.id}`, weekKey: 'week1'}}
                 client={mockClient}
                 onClose={() => setImageStudioPost(null)}
-                // We adapt the save handler to use the original number ID
-                onSave={(_, imageBase64) => handleImageSave(imageStudioPost.id, imageBase64)}
+                onSave={(_, imageUrl) => handleImageSave(imageStudioPost.id, imageUrl)}
             />
         )}
         </>

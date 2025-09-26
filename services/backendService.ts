@@ -1,6 +1,17 @@
 import { Client, RegistrationDetails, ConsultationData, Prescription, Package } from '../types';
 
 // --- MOCK DATABASE ---
+// IMPORTANT NOTICE: This is a MOCK backend that uses the browser's `localStorage`.
+// It is intended for demonstration and single-user, single-browser sessions ONLY.
+//
+// Limitations:
+// - Data is NOT persistent across different browsers or devices.
+// - Data can be easily cleared by the user.
+// - It is NOT secure for multiple users.
+//
+// For a production application, you MUST replace this with a real backend and database
+// (e.g., Firebase, Supabase, a Node.js/Express server with PostgreSQL/MongoDB, etc.).
+
 const DB_KEY = 'dr_business_clients';
 const ADMIN_EMAIL = 'admin@dr.business';
 const ADMIN_PASSWORD = 'password123';

@@ -1,13 +1,20 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ConsultationData, Prescription, VideoOperation, FutureWeek, DetailedPost, SimplePost } from '../types';
 
-// FIX: Hardcoded the API key to resolve runtime errors on Vercel where process.env is unavailable on the client-side.
-const API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
+// IMPORTANT: The API key is sourced from an environment variable for security.
+// In your Vercel project settings, you MUST add an environment variable named 'API_KEY'
+// with your Gemini API key for the deployed application to work.
+const API_KEY = process.env.API_KEY;
 
 if (!API_KEY) {
-    throw new Error('مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.');
+    // This check is primarily for local development. Vercel will fail the build if the env var is missing.
+    console.error('Gemini API key is missing. Please set it in your environment variables.');
 }
 
+// In a production-grade application, you should not call the Gemini API directly from the client-side.
+// Instead, you should create a backend endpoint (e.g., a Vercel Serverless Function) that receives
+// the request from your frontend, adds the API key securely on the server, and then forwards
+// the request to the Gemini API. This prevents your API key from ever being exposed to the public.
 export const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 const detailedPostSchema = {
@@ -115,6 +122,7 @@ function buildPrompt(data: ConsultationData): string {
 
 
 export const generatePrescription = async (data: ConsultationData): Promise<Prescription> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     try {
         const prompt = buildPrompt(data);
 
@@ -140,6 +148,7 @@ export const generatePrescription = async (data: ConsultationData): Promise<Pres
 };
 
 export const generateVideo = async (prompt: string): Promise<VideoOperation> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     try {
         const enhancedPrompt = `Create a highly dynamic and impactful short video (for Instagram Reels/TikTok). Cinematic quality. Use techniques like dynamic camera movements, drone shots, slow motion for emphasis, and energetic fast cuts. The mood should be professional and engaging. Creative brief: "${prompt}"`;
         let operation = await ai.models.generateVideos({
@@ -157,6 +166,7 @@ export const generateVideo = async (prompt: string): Promise<VideoOperation> => 
 };
 
 export const editImageWithPrompt = async (base64ImageData: string, prompt: string): Promise<string> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     try {
         const editResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
@@ -185,6 +195,7 @@ export const editImageWithPrompt = async (base64ImageData: string, prompt: strin
 
 
 export const generateCaptionVariations = async (originalCaption: string, businessContext: string): Promise<string[]> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     const prompt = `
         You are an expert Egyptian copywriter.
         Business context: "${businessContext}"
@@ -222,6 +233,7 @@ export const generateCaptionVariations = async (originalCaption: string, busines
 };
 
 export const generateDetailedWeekPlan = async (businessData: ConsultationData, weekIdeas: SimplePost[]): Promise<DetailedPost[]> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     const prompt = `
         You are "دكتور بزنس", an expert AI marketing consultant speaking in EGYPTIAN COLLOQUIAL ARABIC.
         Your task is to expand a list of simple post ideas into a full, detailed, ready-to-publish content plan for one week.
@@ -262,6 +274,7 @@ export const generateDetailedWeekPlan = async (businessData: ConsultationData, w
 };
 
 export const elaborateOnStrategyStep = async (businessContext: string, step: string): Promise<string> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     const prompt = `
         As an expert marketing consultant ("دكتور بزنس"), provide detailed, actionable advice for the following marketing strategy step, keeping the business context in mind.
         The response must be in EGYPTIAN COLLOQUIAL ARABIC.
@@ -324,6 +337,7 @@ const analyticsSchema = {
 };
 
 export const generateAnalyticsData = async (businessContext: string): Promise<AnalyticsData> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     const prompt = `
         Based on the following business profile, generate a realistic but fictional set of social media analytics data for the last month.
         The data should reflect typical performance for a business of this type.
@@ -350,6 +364,7 @@ export const generateAnalyticsData = async (businessContext: string): Promise<An
 };
 
 export const enhanceVisualPrompt = async (prompt: string): Promise<string> => {
+    if (!API_KEY) throw new Error("مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.");
     const systemInstruction = "You are an expert prompt engineer for AI image generators like Midjourney or Stable Diffusion. Your task is to rewrite and enhance a user's simple prompt into a detailed, artistic, and professional one. The output must be in English.";
     const userPrompt = `
         Enhance the following prompt. Add rich details about style (e.g., photorealistic, cinematic, vector art), lighting (e.g., golden hour, dramatic studio lighting), composition (e.g., close-up, wide-angle shot), and mood. The final prompt should be a single, cohesive paragraph.

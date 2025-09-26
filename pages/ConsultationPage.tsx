@@ -123,8 +123,8 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
   }
   
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-900 animate-fade-in">
-      <div className="w-full max-w-2xl h-[80vh] flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
+    <div className="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 bg-slate-900 animate-fade-in">
+      <div className="w-full max-w-2xl min-h-[70vh] max-h-[85vh] flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
         <div className="p-4 border-b border-slate-700 flex items-center gap-3">
           <BrainCircuitIcon className="w-8 h-8 text-teal-400" />
           <div>

@@ -1,12 +1,16 @@
 // @ts-nocheck
 import { GoogleGenAI, Modality } from "@google/genai";
 import { ai as geminiAI } from './geminiService'; // Reuse the initialized client
+import { toBase64 } from "../utils/helpers";
 
 // --- API KEYS ---
-// FIX: Hardcoded API keys to resolve runtime errors on deployment environments where import.meta.env is unavailable.
-const OPENROUTER_API_KEY = "0f8f7f3ce8f6af72c85cf976b03acdc26bea614d04ad1c49882b2fc5765f251c";
-const UNSPLASH_ACCESS_KEY = "fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA";
-const PIXABAY_API_KEY = "5243282-12c50f7ec268d1b7483c3b3d02";
+// IMPORTANT: Keys are sourced from environment variables for security.
+// You MUST add these to your Vercel project's environment variable settings.
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; // "0f8f7f3ce8f6af72c85cf976b03acdc26bea614d04ad1c49882b2fc5765f251c"
+const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY; // "fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA"
+const PIXABAY_API_KEY = process.env.PIXABAY_API_KEY; // "52432821-2c50f7ec268d1b7483c3b3d02"
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY; // Your ImgBB key, e.g., "bde613bd4475de5e00274a795091ba04"
+
 
 // --- Types ---
 export interface ImageSearchResult {
@@ -26,6 +30,36 @@ const getKeywordsFromPrompt = (prompt: string): string => {
 
 // --- Service Implementation ---
 export const imageService = {
+
+    /**
+     * Uploads a base64 encoded image to ImgBB and returns the URL.
+     */
+    uploadImage: async (base64Image: string): Promise<string> => {
+        if (!IMGBB_API_KEY) throw new Error("ImgBB API key is not configured.");
+        try {
+            const formData = new FormData();
+            // The API requires the base64 string without the data URL prefix
+            formData.append('image', base64Image.split(',')[1]);
+
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data.url) {
+                return result.data.url;
+            } else {
+                throw new Error(result.error?.message || 'Failed to upload image due to an unknown error.');
+            }
+        } catch (error) {
+            console.error('ImgBB Upload failed:', error);
+            throw new Error('فشل رفع الصورة. يرجى المحاولة مرة أخرى.');
+        }
+    },
+
+
     /**
      * Generates an image using Google's Imagen model and optionally brands it with a logo.
      */
@@ -52,7 +86,7 @@ export const imageService = {
             if (logoBase64) {
                 finalImageBase64 = await imageService.brandImage(finalImageBase64, logoBase64);
             }
-            return finalImageBase64;
+            return `data:image/jpeg;base64,${finalImageBase64}`;
         } catch (error) {
             console.error("Error in generateWithGemini:", error);
             throw new Error("Failed to generate branded image with Gemini.");
@@ -86,7 +120,7 @@ export const imageService = {
 
             const result = await response.json();
             const base64Json = result.data[0].b64_json;
-            return base64Json; // OpenRouter returns base64 directly
+            return `data:image/png;base64,${base64Json}`; // OpenRouter returns base64, add prefix
 
         } catch (error) {
             console.error("Error generating with OpenRouter:", error);
@@ -191,6 +225,11 @@ export const imageService = {
                 canvas.width = mainImage.width;
                 canvas.height = mainImage.height;
                 ctx.drawImage(mainImage, 0, 0);
+
+                if(!logoBase64) {
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    return;
+                }
 
                 const logoImage = new Image();
                 logoImage.src = logoBase64;

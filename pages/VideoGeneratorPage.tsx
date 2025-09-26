@@ -26,8 +26,9 @@ type GeneratedVideo = {
     operation: VideoOperation;
 };
 
-// FIX: Hardcoded the API key to resolve runtime errors on Vercel where process.env is unavailable on the client-side.
-const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
+// IMPORTANT: The API key is sourced from an environment variable for security.
+// Ensure 'API_KEY' is set in your Vercel project settings.
+const GEMINI_API_KEY = process.env.API_KEY;
 
 
 const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage, onBackToDashboard }) => {
@@ -51,6 +52,11 @@ const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage
     }, []);
 
      useEffect(() => {
+        if (!GEMINI_API_KEY) {
+            console.error("Gemini API Key is missing for video polling.");
+            return;
+        }
+
         const processingVideos = videos.filter(v => v.status === 'processing');
         if (processingVideos.length === 0) return;
 

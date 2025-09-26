@@ -9,7 +9,7 @@ interface ImageStudioModalProps {
     post: PostWithStatus;
     client: Client;
     onClose: () => void;
-    onSave: (postId: string, imageBase64: string) => void;
+    onSave: (postId: string, imageUrl: string) => void;
 }
 
 type StudioTab = 'gemini' | 'openrouter' | 'unsplash' | 'pixabay';
@@ -22,7 +22,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
     const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
     const [prompt, setPrompt] = useState(post.visualPrompt);
     const [isEnhancing, setIsEnhancing] = useState(false);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [finalBrandedImage, setFinalBrandedImage] = useState<string | null>(null);
+    const isProcessingSave = useRef(false);
 
     const handleEnhancePrompt = async () => {
         setIsEnhancing(true);
@@ -40,23 +41,22 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
         setIsLoading(true);
         setError(null);
         setSearchResults([]);
+        isProcessingSave.current = true;
         try {
             let imageBase64;
             if (generator === 'gemini') {
-                // Gemini function already includes branding as a fallback
-                imageBase64 = await imageService.generateWithGemini(prompt);
+                imageBase64 = await imageService.generateWithGemini(prompt, client.consultationData.business.logo);
             } else {
                 const generatedImage = await imageService.generateWithOpenRouter(prompt);
-                // We need to brand it separately
-                imageBase64 = client.consultationData.business.logo
-                    ? await imageService.brandImage(generatedImage, client.consultationData.business.logo)
-                    : generatedImage;
+                imageBase64 = await imageService.brandImageWithCanvas(generatedImage, client.consultationData.business.logo);
             }
-             onSave(post.id, `data:image/jpeg;base64,${imageBase64}`);
+             const finalUrl = await imageService.uploadImage(imageBase64);
+             onSave(post.id, finalUrl);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'An unknown error occurred.');
         } finally {
             setIsLoading(false);
+            isProcessingSave.current = false;
         }
     };
 
@@ -77,60 +77,34 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
     };
     
     useEffect(() => {
-        if(selectedImageUrl && canvasRef.current && client.consultationData.business.logo) {
+        if(selectedImageUrl) {
             const brandAndDisplay = async () => {
-                 try {
-                     const brandedImage = await imageService.brandImageWithCanvas(selectedImageUrl, client.consultationData.business.logo);
-                     const ctx = canvasRef.current?.getContext('2d');
-                     if(ctx) {
-                         const img = new Image();
-                         img.src = brandedImage;
-                         img.onload = () => {
-                             canvasRef.current!.width = img.width;
-                             canvasRef.current!.height = img.height;
-                             ctx.drawImage(img, 0, 0);
-                         }
-                     }
-                 } catch (e) {
+                try {
+                     const brandedImageB64 = await imageService.brandImageWithCanvas(selectedImageUrl, client.consultationData.business.logo);
+                     setFinalBrandedImage(brandedImageB64);
+                } catch (e) {
                      console.error("Failed to brand image with canvas", e);
-                     // fallback to just showing the image
-                     const ctx = canvasRef.current?.getContext('2d');
-                     if(ctx) {
-                         const img = new Image();
-                         img.crossOrigin = "Anonymous";
-                         img.src = selectedImageUrl;
-                         img.onload = () => {
-                             canvasRef.current!.width = img.width;
-                             canvasRef.current!.height = img.height;
-                             ctx.drawImage(img, 0, 0);
-                         }
-                     }
-                 }
-            }
-            brandAndDisplay();
-        } else if (selectedImageUrl && canvasRef.current) {
-            // No logo, just draw the image
-            const ctx = canvasRef.current?.getContext('2d');
-            if(ctx) {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = selectedImageUrl;
-                img.onload = () => {
-                    canvasRef.current!.width = img.width;
-                    canvasRef.current!.height = img.height;
-                    ctx.drawImage(img, 0, 0);
+                     // fallback to just showing the image if branding fails
+                     setFinalBrandedImage(selectedImageUrl);
                 }
             }
+            brandAndDisplay();
         }
     }, [selectedImageUrl, client.consultationData.business.logo]);
 
-    const handleSaveSelection = () => {
-        if (canvasRef.current) {
-            const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
-            onSave(post.id, dataUrl);
-        } else if (selectedImageUrl) {
-            // Fallback for non-canvas branded images
-            onSave(post.id, selectedImageUrl);
+    const handleSaveSelection = async () => {
+        if (finalBrandedImage && !isProcessingSave.current) {
+            isProcessingSave.current = true;
+            setIsLoading(true);
+            try {
+                const finalUrl = await imageService.uploadImage(finalBrandedImage);
+                onSave(post.id, finalUrl);
+            } catch (e) {
+                setError(e instanceof Error ? e.message : 'Failed to save image.');
+            } finally {
+                setIsLoading(false);
+                isProcessingSave.current = false;
+            }
         }
     }
 
@@ -138,10 +112,15 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
         if (selectedImageUrl) {
             return (
                 <div className="flex flex-col items-center p-4">
-                    <canvas ref={canvasRef} className="max-w-full h-auto max-h-[50vh] rounded-lg border border-slate-600"></canvas>
+                    {finalBrandedImage ? 
+                        <img src={finalBrandedImage} className="max-w-full h-auto max-h-[50vh] rounded-lg border border-slate-600"/>
+                        : <div className="aspect-square w-full max-w-md flex items-center justify-center"><LoadingSpinner className="w-8 h-8"/></div>
+                    }
                     <div className="mt-4 flex gap-4">
                         <button onClick={() => setSelectedImageUrl(null)} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition">العودة للبحث</button>
-                        <button onClick={handleSaveSelection} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-500 transition">حفظ التصميم</button>
+                        <button onClick={handleSaveSelection} disabled={isLoading} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-500 transition disabled:opacity-50">
+                            {isLoading ? 'جاري الحفظ...' : 'حفظ التصميم'}
+                        </button>
                     </div>
                 </div>
             )
@@ -212,7 +191,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
                     <p className="text-sm text-slate-400">اختر المصدر لإنشاء أو العثور على الصورة المثالية لمنشورك.</p>
                 </header>
 
-                <div className="flex border-b border-slate-700">
+                <div className="flex border-b border-slate-700 overflow-x-auto">
                     <TabButton name="AI (Gemini)" isActive={activeTab === 'gemini'} onClick={() => setActiveTab('gemini')} />
                     <TabButton name="AI (Advanced)" isActive={activeTab === 'openrouter'} onClick={() => setActiveTab('openrouter')} />
                     <TabButton name="Unsplash" isActive={activeTab === 'unsplash'} onClick={() => setActiveTab('unsplash')} />
@@ -228,7 +207,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
 };
 
 const TabButton: React.FC<{name: string, isActive: boolean, onClick: () => void}> = ({ name, isActive, onClick }) => (
-    <button onClick={onClick} className={`flex-1 py-3 px-2 text-center font-semibold transition-colors ${isActive ? 'bg-slate-700 text-teal-300' : 'text-slate-400 hover:bg-slate-700/50'}`}>
+    <button onClick={onClick} className={`flex-1 py-3 px-2 text-center font-semibold transition-colors whitespace-nowrap min-w-[120px] ${isActive ? 'bg-slate-700 text-teal-300' : 'text-slate-400 hover:bg-slate-700/50'}`}>
         {name}
     </button>
 );

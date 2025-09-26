@@ -32,6 +32,8 @@ export interface DetailedPost {
   caption: string;
   hashtags: string;
   visualPrompt: string;
+  // FIX: Added optional generatedImage property to align with its usage in dashboard components.
+  generatedImage?: string;
 }
 
 export interface SimplePost {

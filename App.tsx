@@ -15,7 +15,7 @@ import { ConsultationData, Prescription, Package, Client, RegistrationDetails } 
 import { generatePrescription } from './services/geminiService';
 import { backendService, LoginResult } from './services/backendService';
 import { generateWhatsAppLink } from './utils/helpers';
-import { LoadingSpinner } from './components/icons';
+import { LoadingSpinner, DownloadIcon } from './components/icons';
 
 type AppState = 'landing' | 'consultation' | 'analysis' | 'prescription' | 'pricing' | 'registration' | 'payment' | 'pending_activation' | 'client_dashboard' | 'login' | 'admin_dashboard' | 'video_generator';
 
@@ -24,10 +24,23 @@ type Session = {
     clientId?: number;
 } | null;
 
+// BeforeInstallPromptEvent is not in standard TS lib yet
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
+
 function App() {
   const [page, setPage] = useState<AppState>('landing');
   const [session, setSession] = useState<Session>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+
 
   // New Client Onboarding Flow State
   const [consultationData, setConsultationData] = useState<ConsultationData | null>(null);
@@ -38,6 +51,35 @@ function App() {
 
   // Active Data for Dashboards
   const [activeClient, setActiveClient] = useState<Client | null>(null);
+
+  // PWA Install Prompt Logic
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPromptEvent(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = () => {
+    if (installPromptEvent) {
+      installPromptEvent.prompt();
+      installPromptEvent.userChoice.then(choiceResult => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the A2HS prompt');
+        } else {
+          console.log('User dismissed the A2HS prompt');
+        }
+        setInstallPromptEvent(null);
+      });
+    }
+  };
+
 
   // Initial check for a session (e.g., from a cookie or localStorage in a real app)
   useEffect(() => {
@@ -222,6 +264,17 @@ function App() {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen">
+      {installPromptEvent && (
+         <div className="fixed bottom-4 right-4 z-50">
+           <button
+             onClick={handleInstallClick}
+             className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 animate-fade-in"
+           >
+             <DownloadIcon className="w-5 h-5" />
+             <span>تثبيت التطبيق</span>
+           </button>
+         </div>
+      )}
       {renderPage()}
     </div>
   );
