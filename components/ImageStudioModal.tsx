@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Client } from '../types';
 import { PostWithStatus } from '../pages/ClientDashboardPage';
 import { imageService, ImageSearchResult } from '../services/imageService';
-import { LoadingSpinner, Wand2Icon } from './icons';
+import { enhanceVisualPrompt } from '../services/geminiService';
+import { LoadingSpinner, Wand2Icon, SparklesIcon } from './icons';
 
 interface ImageStudioModalProps {
     post: PostWithStatus;
@@ -19,8 +20,22 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
     const [error, setError] = useState<string | null>(null);
     const [searchResults, setSearchResults] = useState<ImageSearchResult[]>([]);
     const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+    const [prompt, setPrompt] = useState(post.visualPrompt);
+    const [isEnhancing, setIsEnhancing] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
+    const handleEnhancePrompt = async () => {
+        setIsEnhancing(true);
+        try {
+            const enhanced = await enhanceVisualPrompt(prompt);
+            setPrompt(enhanced);
+        } catch (e) {
+            console.error("Failed to enhance prompt", e);
+        } finally {
+            setIsEnhancing(false);
+        }
+    };
+    
     const handleGenerate = async (generator: 'gemini' | 'openrouter') => {
         setIsLoading(true);
         setError(null);
@@ -29,9 +44,9 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
             let imageBase64;
             if (generator === 'gemini') {
                 // Gemini function already includes branding as a fallback
-                imageBase64 = await imageService.generateWithGemini(post.visualPrompt);
+                imageBase64 = await imageService.generateWithGemini(prompt);
             } else {
-                const generatedImage = await imageService.generateWithOpenRouter(post.visualPrompt);
+                const generatedImage = await imageService.generateWithOpenRouter(prompt);
                 // We need to brand it separately
                 imageBase64 = client.consultationData.business.logo
                     ? await imageService.brandImage(generatedImage, client.consultationData.business.logo)
@@ -51,8 +66,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
         setSearchResults([]);
         try {
             const results = searcher === 'unsplash'
-                ? await imageService.searchUnsplash(post.visualPrompt)
-                : await imageService.searchPixabay(post.visualPrompt);
+                ? await imageService.searchUnsplash(prompt)
+                : await imageService.searchPixabay(prompt);
             setSearchResults(results);
         } catch (e) {
              setError(e instanceof Error ? e.message : 'An unknown error occurred.');
@@ -122,7 +137,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
     const renderTabContent = () => {
         if (selectedImageUrl) {
             return (
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center p-4">
                     <canvas ref={canvasRef} className="max-w-full h-auto max-h-[50vh] rounded-lg border border-slate-600"></canvas>
                     <div className="mt-4 flex gap-4">
                         <button onClick={() => setSelectedImageUrl(null)} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition">العودة للبحث</button>
@@ -143,11 +158,22 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
             case 'gemini':
             case 'openrouter':
                 return (
-                    <div className="text-center p-8">
+                    <div className="text-center p-6">
                         <h3 className="text-xl font-bold mb-2">توليد صورة بالذكاء الاصطناعي</h3>
-                        <p className="text-slate-400 mb-6 max-w-md mx-auto">سيتم إنشاء صورة فريدة بناءً على الوصف التالي:</p>
-                        <p className="bg-slate-700/50 p-3 rounded-md text-slate-300 mb-6 font-mono text-sm">"{post.visualPrompt}"</p>
-                        <button onClick={() => handleGenerate(activeTab)} className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-6 rounded-full hover:from-teal-600 hover:to-blue-700 transition flex items-center gap-2 mx-auto">
+                        <p className="text-slate-400 mb-4 max-w-lg mx-auto">عدّل الوصف للحصول على أفضل النتائج، أو استخدم مساعد الذكاء الاصطناعي لتحسينه.</p>
+                        <div className="relative">
+                            <textarea 
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                rows={4}
+                                className="w-full p-3 pr-28 bg-slate-700/50 rounded-md border border-slate-600 focus:ring-2 focus:ring-teal-400 focus:outline-none font-mono text-sm"
+                            />
+                            <button onClick={handleEnhancePrompt} disabled={isEnhancing} className="absolute top-2 right-2 flex items-center gap-1.5 bg-slate-600 text-white font-bold py-1 px-3 rounded-md hover:bg-slate-500 transition text-xs disabled:opacity-50">
+                                {isEnhancing ? <LoadingSpinner className="w-4 h-4" /> : <SparklesIcon className="w-4 h-4 text-teal-300" />}
+                                تحسين
+                            </button>
+                        </div>
+                        <button onClick={() => handleGenerate(activeTab)} className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-6 rounded-full hover:from-teal-600 hover:to-blue-700 transition flex items-center gap-2 mx-auto mt-4">
                            <Wand2Icon className="w-5 h-5"/> {`إنشاء باستخدام ${activeTab === 'gemini' ? 'Gemini' : 'Stable Diffusion'}`}
                         </button>
                     </div>
@@ -157,8 +183,10 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
                 return (
                     <div>
                          <div className="text-center p-4">
+                            <p className="text-sm text-slate-400 mb-2">البحث عن صور بناءً على الوصف:</p>
+                             <p className="bg-slate-700/50 p-2 rounded-md text-slate-300 mb-4 font-mono text-xs max-w-md mx-auto truncate">"{prompt}"</p>
                             <button onClick={() => handleSearch(activeTab)} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition">
-                                {`ابحث في ${activeTab === 'unsplash' ? 'Unsplash' : 'Pixabay'} عن صور`}
+                                {`ابحث في ${activeTab === 'unsplash' ? 'Unsplash' : 'Pixabay'}`}
                             </button>
                          </div>
                          {searchResults.length > 0 && (

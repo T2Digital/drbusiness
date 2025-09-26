@@ -184,7 +184,8 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
         {imageStudioPost && mockClient && (
             <ImageStudioModal
                 // We pass a post with a string ID as the component expects
-                post={{...imageStudioPost, id: `week1-${imageStudioPost.id}`}}
+                // FIX: Added missing 'weekKey' property to satisfy the PostWithStatus type required by ImageStudioModal.
+                post={{...imageStudioPost, id: `week1-${imageStudioPost.id}`, weekKey: 'week1'}}
                 client={mockClient}
                 onClose={() => setImageStudioPost(null)}
                 // We adapt the save handler to use the original number ID

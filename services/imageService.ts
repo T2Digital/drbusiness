@@ -6,7 +6,7 @@ import { ai as geminiAI } from './geminiService'; // Reuse the initialized clien
 // FIX: Hardcoded API keys to resolve runtime errors on deployment environments where import.meta.env is unavailable.
 const OPENROUTER_API_KEY = "0f8f7f3ce8f6af72c85cf976b03acdc26bea614d04ad1c49882b2fc5765f251c";
 const UNSPLASH_ACCESS_KEY = "fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA";
-const PIXABAY_API_KEY = "45243282-12c50f7ec268d1b7483c3b3d02";
+const PIXABAY_API_KEY = "5243282-12c50f7ec268d1b7483c3b3d02";
 
 // --- Types ---
 export interface ImageSearchResult {

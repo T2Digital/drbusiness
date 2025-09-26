@@ -26,8 +26,8 @@ type GeneratedVideo = {
     operation: VideoOperation;
 };
 
-// FIX: Per @google/genai guidelines, the API key for fetching video assets must be from process.env.API_KEY.
-const GEMINI_API_KEY = process.env.API_KEY as string;
+// FIX: Hardcoded the API key to resolve runtime errors on Vercel where process.env is unavailable on the client-side.
+const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
 
 
 const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage, onBackToDashboard }) => {

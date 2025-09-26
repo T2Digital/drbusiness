@@ -1,11 +1,11 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ConsultationData, Prescription, VideoOperation, FutureWeek, DetailedPost, SimplePost } from '../types';
 
-// FIX: Per @google/genai guidelines, the API key must be retrieved from process.env.API_KEY.
-const API_KEY = process.env.API_KEY as string;
+// FIX: Hardcoded the API key to resolve runtime errors on Vercel where process.env is unavailable on the client-side.
+const API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
 
 if (!API_KEY) {
-    throw new Error('مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح في متغيرات البيئة.');
+    throw new Error('مفتاح واجهة برمجة تطبيقات Gemini غير موجود. يرجى التأكد من إعداده بشكل صحيح.');
 }
 
 export const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -258,5 +258,127 @@ export const generateDetailedWeekPlan = async (businessData: ConsultationData, w
     } catch (error) {
         console.error("Error generating detailed week plan:", error);
         throw new Error("Failed to generate detailed content for the week.");
+    }
+};
+
+export const elaborateOnStrategyStep = async (businessContext: string, step: string): Promise<string> => {
+    const prompt = `
+        As an expert marketing consultant ("دكتور بزنس"), provide detailed, actionable advice for the following marketing strategy step, keeping the business context in mind.
+        The response must be in EGYPTIAN COLLOQUIAL ARABIC.
+
+        Business Context: ${businessContext}
+        Strategy Step: "${step}"
+
+        Your elaboration should include:
+        1.  **Why it's important:** Briefly explain the value of this step.
+        2.  **How to execute:** Provide 3-4 concrete, practical actions to implement this step.
+        3.  **Example:** Give a specific, creative example relevant to the business.
+        4.  **KPIs to track:** Suggest 2-3 key performance indicators to measure success.
+
+        Format the response as a single block of text using markdown for clarity (e.g., using **bold** titles).
+    `;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Error elaborating on strategy step:", error);
+        throw new Error("Failed to get details for the strategy step.");
+    }
+};
+
+export interface AnalyticsData {
+    followerGrowth: { value: number; trend: number; };
+    engagementRate: { value: number; trend: number; };
+    reach: { value: number; trend: number; };
+    weeklyPerformance: number[]; // Array of 7 numbers (0-100)
+}
+
+const analyticsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        followerGrowth: {
+            type: Type.OBJECT,
+            properties: { value: { type: Type.INTEGER, description: "Total number of followers." }, trend: { type: Type.NUMBER, description: "Percentage change in followers this month." } },
+            required: ["value", "trend"]
+        },
+        engagementRate: {
+            type: Type.OBJECT,
+            properties: { value: { type: Type.NUMBER, description: "Overall engagement rate percentage." }, trend: { type: Type.NUMBER, description: "Percentage point change in engagement this month." } },
+            required: ["value", "trend"]
+        },
+        reach: {
+            type: Type.OBJECT,
+            properties: { value: { type: Type.INTEGER, description: "Total reach this month." }, trend: { type: Type.NUMBER, description: "Percentage change in reach this month." } },
+             required: ["value", "trend"]
+        },
+        weeklyPerformance: {
+            type: Type.ARRAY,
+            items: { type: Type.INTEGER },
+            description: "An array of 7 integers between 0 and 100 representing engagement for each day of the week, starting with Sunday."
+        }
+    },
+    required: ["followerGrowth", "engagementRate", "reach", "weeklyPerformance"]
+};
+
+export const generateAnalyticsData = async (businessContext: string): Promise<AnalyticsData> => {
+    const prompt = `
+        Based on the following business profile, generate a realistic but fictional set of social media analytics data for the last month.
+        The data should reflect typical performance for a business of this type.
+
+        Business Context: ${businessContext}
+
+        Return a single, valid JSON object matching the provided schema. The numbers should be plausible.
+    `;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: analyticsSchema,
+            },
+        });
+        const jsonText = response.text;
+        return JSON.parse(jsonText) as AnalyticsData;
+    } catch (error) {
+        console.error("Error generating analytics data:", error);
+        throw new Error("Failed to generate analytics data.");
+    }
+};
+
+export const enhanceVisualPrompt = async (prompt: string): Promise<string> => {
+    const systemInstruction = "You are an expert prompt engineer for AI image generators like Midjourney or Stable Diffusion. Your task is to rewrite and enhance a user's simple prompt into a detailed, artistic, and professional one. The output must be in English.";
+    const userPrompt = `
+        Enhance the following prompt. Add rich details about style (e.g., photorealistic, cinematic, vector art), lighting (e.g., golden hour, dramatic studio lighting), composition (e.g., close-up, wide-angle shot), and mood. The final prompt should be a single, cohesive paragraph.
+
+        Original prompt: "${prompt}"
+
+        Return a JSON object with a single key "enhancedPrompt" containing the new, enhanced prompt string.
+    `;
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: userPrompt,
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        enhancedPrompt: { type: Type.STRING }
+                    },
+                    required: ["enhancedPrompt"]
+                }
+            }
+        });
+        const jsonText = response.text;
+        const result = JSON.parse(jsonText);
+        return result.enhancedPrompt;
+    } catch (error) {
+        console.error("Error enhancing prompt:", error);
+        throw new Error("Failed to enhance prompt.");
     }
 };

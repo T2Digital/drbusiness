@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Prescription, Client, DetailedPost, FutureWeek, Package, SimplePost, SocialConnections } from '../types';
-import { editImageWithPrompt, generateCaptionVariations, generateDetailedWeekPlan } from '../services/geminiService';
-import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, ChartBarIcon, LinkIcon, VideoIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon } from '../components/icons';
+import { editImageWithPrompt, generateCaptionVariations, generateDetailedWeekPlan, elaborateOnStrategyStep, generateAnalyticsData, AnalyticsData } from '../services/geminiService';
+import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, ChartBarIcon, LinkIcon, VideoIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ImageStudioModal } from '../components/ImageStudioModal';
 
@@ -186,8 +186,8 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
                 onFetchCaptionIdeas={handleFetchCaptionIdeas}
                 onSchedule={(post) => setSchedulingState({ post, selectedPlatforms: {} })}
             />;
-            case 'strategy': return <AnnualStrategyView strategy={client.prescription!.strategy} />;
-            case 'analytics': return <AnalyticsView />;
+            case 'strategy': return <AnnualStrategyView client={client} />;
+            case 'analytics': return <AnalyticsView client={client} />;
             case 'connections': return <ConnectionsView connections={client.connections} onUpdateConnections={handleUpdateConnections} />;
             default: return <div>Select a view</div>;
         }
@@ -357,7 +357,23 @@ const ContentCalendarView: React.FC<{
     </div>
 };
 
-const AnnualStrategyView: React.FC<{ strategy: Prescription['strategy'] }> = ({ strategy }) => (
+const AnnualStrategyView: React.FC<{ client: Client }> = ({ client }) => {
+    const { strategy } = client.prescription;
+    const [elaboration, setElaboration] = useState<{ index: number; text: string; isLoading: boolean } | null>(null);
+
+    const handleElaborate = async (step: string, index: number) => {
+        setElaboration({ index, text: '', isLoading: true });
+        try {
+            const businessContext = `Business: ${client.consultationData.business.name} (${client.consultationData.business.field}). Description: ${client.consultationData.business.description}`;
+            const result = await elaborateOnStrategyStep(businessContext, step);
+            setElaboration({ index, text: result, isLoading: false });
+        } catch (error) {
+            console.error(error);
+            setElaboration({ index, text: 'حدث خطأ أثناء جلب التفاصيل.', isLoading: false });
+        }
+    };
+
+    return (
     <div>
         <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">الاستراتيجية السنوية</h1>
         <p className="text-slate-400 mb-8">خارطة طريقك طويلة الأمد لتحقيق نمو مستدام.</p>
@@ -365,24 +381,92 @@ const AnnualStrategyView: React.FC<{ strategy: Prescription['strategy'] }> = ({ 
             <div className="flex items-center gap-4 mb-4"><BrainCircuitIcon className="w-10 h-10 text-teal-400" /><h2 className="text-2xl sm:text-3xl font-bold text-teal-300">{strategy.title}</h2></div>
             <p className="text-slate-300 mb-6 text-base sm:text-lg leading-relaxed">{strategy.summary}</p>
             <div className="space-y-4 border-t border-slate-700 pt-6">
-                {strategy.steps.map((step, i) => (<div key={i} className="flex items-start"><div className="flex-shrink-0 w-8 h-8 bg-teal-500/20 text-teal-300 rounded-full flex items-center justify-center font-bold mr-4">{i + 1}</div><p className="text-slate-300 text-md">{step}</p></div>))}
+                {strategy.steps.map((step, i) => (
+                    <div key={i} className="p-4 rounded-lg bg-slate-900/50 transition-all">
+                        <div className="flex justify-between items-start">
+                             <div className="flex items-start">
+                                <div className="flex-shrink-0 w-8 h-8 bg-teal-500/20 text-teal-300 rounded-full flex items-center justify-center font-bold mr-4">{i + 1}</div>
+                                <p className="text-slate-300 text-md pt-1">{step}</p>
+                             </div>
+                            <button onClick={() => handleElaborate(step, i)} className="text-sm text-teal-400 hover:text-teal-300 font-semibold flex-shrink-0">
+                                {elaboration?.index === i && elaboration.isLoading ? 'جاري...' : 'تفاصيل أكثر'}
+                            </button>
+                        </div>
+                        {elaboration?.index === i && (
+                            <div className="mt-4 mr-12 border-l-2 border-teal-500/30 pl-4">
+                                {elaboration.isLoading ? <LoadingSpinner className="w-6 h-6 text-teal-400"/> : 
+                                <div className="prose prose-invert prose-sm text-slate-300 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: elaboration.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                }
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
         </div>
     </div>
-);
+    )
+};
 
-const AnalyticsView: React.FC = () => (
-    <div>
-        <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">تحليلات الأداء</h1>
-        <p className="text-slate-400 mb-8">نظرة شاملة على أداء حسابك (بيانات محاكاة).</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-slate-400 text-sm font-medium">نمو المتابعين</h3><p className="text-3xl font-bold text-white mt-1">1,250</p><p className="text-sm text-green-400 mt-1">+15% الشهر ده</p></div>
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-slate-400 text-sm font-medium">معدل التفاعل</h3><p className="text-3xl font-bold text-white mt-1">4.8%</p><p className="text-sm text-green-400 mt-1">+0.5% الشهر ده</p></div>
-            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-slate-400 text-sm font-medium">مرات الظهور</h3><p className="text-3xl font-bold text-white mt-1">85,430</p><p className="text-sm text-green-400 mt-1">+22% الشهر ده</p></div>
+const AnalyticsView: React.FC<{ client: Client }> = ({ client }) => {
+    const [data, setData] = useState<AnalyticsData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchAnalytics = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+             const businessContext = `Business: ${client.consultationData.business.name} (${client.consultationData.business.field}). Description: ${client.consultationData.business.description}`;
+             const result = await generateAnalyticsData(businessContext);
+             setData(result);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to load analytics.');
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchAnalytics();
+    }, [client]);
+
+     if (isLoading) {
+        return <div className="flex flex-col items-center justify-center h-full"><LoadingSpinner className="w-12 h-12 text-teal-400" /><p className="mt-4 text-slate-400">جاري توليد تقرير تحليلات مخصص...</p></div>;
+    }
+
+    if (error || !data) {
+        return <div className="text-center text-red-400">
+            <p>حدث خطأ أثناء تحميل التحليلات.</p>
+            <button onClick={fetchAnalytics} className="mt-4 bg-slate-600 p-2 rounded-md">حاول مرة أخرى</button>
+        </div>;
+    }
+
+    const Trend: React.FC<{value: number}> = ({ value }) => (
+        <p className={`text-sm mt-1 font-bold ${value >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {value >= 0 ? '+' : ''}{value.toFixed(1)}% الشهر ده
+        </p>
+    );
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-2">
+                <div>
+                    <h1 className="text-3xl md:text-4xl font-extrabold text-white">تحليلات الأداء</h1>
+                    <p className="text-slate-400">نظرة شاملة على أداء حسابك (بيانات مولدة بالذكاء الاصطناعي).</p>
+                </div>
+                 <button onClick={fetchAnalytics} disabled={isLoading} className="p-2 rounded-full bg-slate-700 hover:bg-slate-600 disabled:opacity-50">
+                    <RefreshIcon className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-slate-400 text-sm font-medium">نمو المتابعين</h3><p className="text-3xl font-bold text-white mt-1">{data.followerGrowth.value.toLocaleString()}</p><Trend value={data.followerGrowth.trend} /></div>
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-slate-400 text-sm font-medium">معدل التفاعل</h3><p className="text-3xl font-bold text-white mt-1">{data.engagementRate.value.toFixed(1)}%</p><Trend value={data.engagementRate.trend} /></div>
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-slate-400 text-sm font-medium">مرات الظهور</h3><p className="text-3xl font-bold text-white mt-1">{data.reach.value.toLocaleString()}</p><Trend value={data.reach.trend} /></div>
+            </div>
+            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-xl font-bold text-white mb-4">التفاعل على مدار الأسبوع</h3><div className="h-64 flex items-end justify-between text-center overflow-x-auto p-2">{['حد', 'اتنين', 'تلات', 'أربع', 'خميس', 'جمعة', 'سبت'].map((day, i) => (<div key={day} className="w-1/7 flex-shrink-0 px-2 flex flex-col items-center h-full justify-end"><div className="w-8 bg-gradient-to-t from-teal-500 to-blue-500 rounded-t-md" style={{height: `${data.weeklyPerformance[i]}%`}}></div><span className="text-xs text-slate-400 mt-2">{day}</span></div>))}</div></div>
         </div>
-        <div className="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 className="text-xl font-bold text-white mb-4">التفاعل على مدار الأسبوع</h3><div className="h-64 flex items-end justify-between text-center overflow-x-auto p-2">{['حد', 'اتنين', 'تلات', 'أربع', 'خميس', 'جمعة', 'سبت'].map((day, i) => (<div key={day} className="w-1/7 flex-shrink-0 px-2 flex flex-col items-center h-full justify-end"><div className="w-8 bg-gradient-to-t from-teal-500 to-blue-500 rounded-t-md" style={{height: `${[60, 75, 50, 85, 95, 70, 40][i]}%`}}></div><span className="text-xs text-slate-400 mt-2">{day}</span></div>))}</div></div>
-    </div>
-);
+    );
+}
 
 const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnections: (c: SocialConnections) => void}> = ({ connections, onUpdateConnections }) => {
     const socialPlatforms: {key: keyof SocialConnections, name: string, icon: React.FC<any>}[] = [
