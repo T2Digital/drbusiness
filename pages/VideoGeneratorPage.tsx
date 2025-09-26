@@ -9,7 +9,10 @@ interface VideoGeneratorPageProps {
     onBackToDashboard: () => void;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// FIX: Hardcoded API key to resolve Vercel deployment issues.
+const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
 
 const loadingMessages = [
     "يتم الآن استدعاء خلايا الإبداع السينمائي...",
@@ -90,7 +93,7 @@ const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage
             if (operation.response?.generatedVideos?.[0]?.video?.uri) {
                 const downloadLink = operation.response.generatedVideos[0].video.uri;
                 // Fetch the video as a blob and create an object URL to avoid exposing API key in the video src
-                const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                const response = await fetch(`${downloadLink}&key=${GEMINI_API_KEY}`);
                 if (!response.ok) {
                     throw new Error(`Failed to download video: ${response.statusText}`);
                 }

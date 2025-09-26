@@ -1,7 +1,9 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { ConsultationData, Prescription, SimplePost, DetailedPost, AnalyticsData } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// FIX: Hardcoded API key to resolve Vercel deployment issues.
+const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 const model = 'gemini-2.5-flash';
 

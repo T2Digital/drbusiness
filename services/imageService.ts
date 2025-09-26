@@ -1,6 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// FIX: Hardcoded API keys to resolve Vercel deployment issues.
+const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
+const UNSPLASH_API_KEY = 'fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA';
+const PIXABAY_API_KEY = '52432821-2c50f7ec268d1b7483c3b3d02';
+const IMGBB_API_KEY = 'bde613bd4475de5e00274a795091ba04';
+
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 const imageModel = 'imagen-4.0-generate-001';
 
 export interface ImageSearchResult {
@@ -10,11 +16,6 @@ export interface ImageSearchResult {
   alt: string;
   user: string;
 }
-
-// MOCK API KEYS - in a real app, these would be in .env
-const UNSPLASH_API_KEY = 'YOUR_UNSPLASH_ACCESS_KEY';
-const PIXABAY_API_KEY = 'YOUR_PIXABAY_API_KEY';
-
 
 export const imageService = {
   /**
@@ -55,44 +56,38 @@ export const imageService = {
   },
 
   /**
-   * Searches Unsplash for images. MOCKED for this demo.
+   * Searches Unsplash for images.
    */
   searchUnsplash: async (query: string): Promise<ImageSearchResult[]> => {
-      console.log(`Mock searching Unsplash for: ${query}`);
-      await new Promise(res => setTimeout(res, 500)); // Simulate network
-      // In a real app:
-      // const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${UNSPLASH_API_KEY}`);
-      // const data = await response.json();
-      // return data.results.map(...);
-      
-      // Mocked response:
-      return Array.from({ length: 8 }).map((_, i) => ({
-          id: `unsplash_${i}`,
-          url: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/200`,
-          fullUrl: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/1080`,
-          alt: `mock image for ${query}`,
-          user: 'Mock User',
+      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=20&client_id=${UNSPLASH_API_KEY}`);
+      if (!response.ok) {
+          throw new Error('Failed to fetch from Unsplash');
+      }
+      const data = await response.json();
+      return data.results.map((img: any) => ({
+          id: img.id,
+          url: img.urls.small,
+          fullUrl: img.urls.regular,
+          alt: img.alt_description,
+          user: img.user.name,
       }));
   },
 
   /**
-   * Searches Pixabay for images. MOCKED for this demo.
+   * Searches Pixabay for images.
    */
   searchPixabay: async (query: string): Promise<ImageSearchResult[]> => {
-      console.log(`Mock searching Pixabay for: ${query}`);
-      await new Promise(res => setTimeout(res, 500)); // Simulate network
-      // In a real app:
-      // const response = await fetch(`https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(query)}`);
-      // const data = await response.json();
-      // return data.hits.map(...);
-
-      // Mocked response:
-       return Array.from({ length: 8 }).map((_, i) => ({
-          id: `pixabay_${i}`,
-          url: `https://picsum.photos/seed/${encodeURIComponent(query)}pix${i}/200`,
-          fullUrl: `https://picsum.photos/seed/${encodeURIComponent(query)}pix${i}/1080`,
-          alt: `mock image for ${query}`,
-          user: 'Mock User',
+      const response = await fetch(`https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(query)}&per_page=20`);
+       if (!response.ok) {
+          throw new Error('Failed to fetch from Pixabay');
+      }
+      const data = await response.json();
+      return data.hits.map((img: any) => ({
+          id: img.id,
+          url: img.webformatURL,
+          fullUrl: img.largeImageURL,
+          alt: img.tags,
+          user: img.user,
       }));
   },
   
@@ -142,20 +137,35 @@ export const imageService = {
   },
 
   /**
-   * "Uploads" an image. In this mock, it just returns the base64 data URL.
-   * A real implementation would upload to a CDN (S3, Cloudinary, etc.) and return a permanent URL.
-   * @param base64Image The base64 encoded image string (can be a data URL).
-   * @returns A promise that resolves with a URL to the image (in this case, the data URL itself).
+   * Uploads an image to ImgBB and returns a permanent URL.
+   * @param base64Image The base64 encoded image string (must be a data URL).
+   * @returns A promise that resolves with a permanent URL to the uploaded image.
    */
   uploadImage: async (base64Image: string): Promise<string> => {
-      // Simulate upload delay
-      await new Promise(res => setTimeout(res, 500));
-      // In a real app, this would be an API call to your backend/CDN.
-      // For the demo, we just return the data URL which works for display and linking.
-      if (base64Image.startsWith('data:')) {
-          return base64Image;
+      if (!base64Image.startsWith('data:image')) {
+        throw new Error("Invalid base64 string for upload. Must be a data URL.");
       }
-      // Assuming it's just the base64 part
-      return `data:image/png;base64,${base64Image}`;
+      // Remove data URL prefix
+      const base64Data = base64Image.split(',')[1];
+      
+      const formData = new FormData();
+      formData.append('image', base64Data);
+
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData,
+      });
+
+      if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`ImgBB upload failed: ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (result.data && result.data.url) {
+          return result.data.url;
+      } else {
+          throw new Error('ImgBB upload failed: Invalid response format.');
+      }
   },
 };

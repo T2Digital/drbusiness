@@ -45,7 +45,9 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
         try {
             let imageBase64;
             if (generator === 'gemini') {
-                imageBase64 = await imageService.generateWithGemini(prompt, client.consultationData.business.logo);
+                // FIX: `generateWithGemini` only takes one argument. The branding step is separated.
+                const generatedImage = await imageService.generateWithGemini(prompt);
+                imageBase64 = await imageService.brandImageWithCanvas(generatedImage, client.consultationData.business.logo);
             } else {
                 const generatedImage = await imageService.generateWithOpenRouter(prompt);
                 imageBase64 = await imageService.brandImageWithCanvas(generatedImage, client.consultationData.business.logo);
