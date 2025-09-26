@@ -1,39 +1,70 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { BrainCircuitIcon } from '../components/icons';
+import { AboutModal } from '../components/AboutModal';
 
 interface LandingPageProps {
   onStart: () => void;
+  onLogin: () => void;
+  onAdmin: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-slate-900">
-      <header className="mb-8">
-        <div className="inline-flex items-center justify-center gap-4 mb-4">
-          <BrainCircuitIcon className="w-16 h-16 text-teal-400" />
-          <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-blue-500">
-            دكتور بزنس
-          </h1>
-        </div>
-        <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-400">
-          منصتك المتكاملة لتحويل أفكارك إلى استراتيجيات تسويق فيروسية ومحتوى إبداعي، كل ذلك بقوة الذكاء الاصطناعي.
-        </p>
-      </header>
-      
-      <main className="mb-12">
-        <button
-          onClick={onStart}
-          className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-4 px-10 rounded-full hover:from-teal-600 hover:to-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-teal-400 transition-all duration-300 transform hover:scale-110 text-lg shadow-2xl shadow-teal-500/20"
-        >
-          🚀 ابدأ استشارتك التسويقية المجانية
-        </button>
-      </main>
+const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onAdmin }) => {
+  const [isAboutModalOpen, setAboutModalOpen] = useState(false);
 
-      <footer className="text-slate-500 text-sm">
-        <p>تم التطوير بواسطة الذكاء الاصطناعي | دكتور بزنس &copy; 2024</p>
+  return (
+    <>
+    <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-slate-900 relative overflow-hidden">
+      
+      <div className="absolute top-0 left-0 -translate-x-1/3 -translate-y-1/3 w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-teal-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-blue-500/10 rounded-full blur-3xl"></div>
+
+      <nav className="absolute top-0 right-0 p-4 sm:p-6">
+        <button onClick={onLogin} className="bg-slate-800/50 text-white font-bold py-2 px-5 sm:px-6 rounded-full hover:bg-slate-700/70 transition backdrop-blur-sm text-sm sm:text-base">
+          تسجيل الدخول
+        </button>
+      </nav>
+
+      <div className="relative z-10">
+        <header className="mb-8">
+          <div className="inline-flex items-center justify-center gap-3 sm:gap-4 mb-4">
+            <BrainCircuitIcon className="w-12 h-12 sm:w-16 sm:h-16 text-teal-400" />
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-blue-500">
+              دكتور بزنس
+            </h1>
+          </div>
+          <p className="max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-slate-400">
+            منصتك المتكاملة لتحويل أفكارك إلى استراتيجيات تسويق فيروسية ومحتوى إبداعي، كل ذلك بقوة الذكاء الاصطناعي.
+          </p>
+        </header>
+        
+        <main className="mb-12">
+          <button
+            onClick={onStart}
+            className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-8 sm:py-4 sm:px-10 rounded-full hover:from-teal-600 hover:to-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-teal-400 transition-all duration-300 transform hover:scale-105 text-base sm:text-lg shadow-2xl shadow-teal-500/20"
+          >
+            🚀 ابدأ استشارتك التسويقية المجانية
+          </button>
+        </main>
+      </div>
+
+      <section id="about" className="relative z-10 w-full max-w-4xl p-6 sm:p-8 bg-slate-800/50 rounded-2xl border border-slate-700 backdrop-blur-sm">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4 text-white">من هو دكتور بزنس؟</h2>
+          <p className="text-center text-slate-300 leading-relaxed text-sm sm:text-base">
+            دكتور بزنس مش مجرد أداة، ده شريكك الاستراتيجي الذكي. إحنا بنجمع بين قوة نماذج الذكاء الاصطناعي المتقدمة وفهم عميق للسوق العربي عشان نقدملك "روشتات" تسويقية مخصوصة، فعالة، ومبتكرة. من تحليل فكرة مشروعك لغاية إنشاء محتوى جاهز للنشر وتصميمات جذابة، إحنا معاك في كل خطوة في رحلتك للنجاح الرقمي.
+          </p>
+      </section>
+
+      <footer className="relative z-10 text-slate-500 text-xs sm:text-sm mt-12">
+        <div className="flex gap-4">
+          <button onClick={() => setAboutModalOpen(true)} className="hover:text-teal-400 transition">مين إحنا</button>
+          <span>|</span>
+          <button onClick={onAdmin} className="hover:text-teal-400 transition">لوحة تحكم المدير</button>
+        </div>
+        <p className="mt-2">تم التطوير بواسطة الذكاء الاصطناعي | دكتور بزنس &copy; 2024</p>
       </footer>
     </div>
+    <AboutModal isOpen={isAboutModalOpen} onClose={() => setAboutModalOpen(false)} />
+    </>
   );
 };
 

@@ -1,7 +1,10 @@
-
 import React from 'react';
 
-const DashboardPage: React.FC = () => {
+interface ConfirmationPageProps {
+    onGoToDashboard: () => void;
+}
+
+const ConfirmationPage: React.FC<ConfirmationPageProps> = ({ onGoToDashboard }) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-slate-900 animate-fade-in">
       <div className="w-full max-w-2xl bg-slate-800 rounded-2xl shadow-2xl p-12 border border-slate-700">
@@ -15,7 +18,7 @@ const DashboardPage: React.FC = () => {
           مرحبًا بك في لوحة تحكم دكتور بزنس. فريقنا سيتواصل معك قريبًا لبدء تنفيذ الاستراتيجية.
         </p>
         <button
-          onClick={() => alert('سيتم نقلك إلى لوحة التحكم قريبًا!')}
+          onClick={onGoToDashboard}
           className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-8 rounded-full hover:from-teal-600 hover:to-blue-700 transition"
         >
           الانتقال إلى لوحة التحكم
@@ -25,4 +28,4 @@ const DashboardPage: React.FC = () => {
   );
 };
 
-export default DashboardPage;
+export default ConfirmationPage;
