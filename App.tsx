@@ -255,7 +255,7 @@ function App() {
       case 'login':
         return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => setPage('landing')} />;
       case 'consultation':
-        return <ConsultationPage onSubmit={handleConsultationSubmit} />;
+        return <ConsultationPage onSubmit={handleConsultationSubmit} onBackToHome={() => setPage('landing')} onLogin={handleGoToLogin} />;
       case 'analysis':
         return <AnalysisPage />;
       case 'prescription':

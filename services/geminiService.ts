@@ -284,4 +284,23 @@ export const generateAnalyticsData = async (businessContext: string): Promise<An
     });
 
     return JSON.parse(response.text) as AnalyticsData;
-}
+};
+
+export const getTrendingTopics = async (): Promise<string> => {
+    const prompt = `
+        Analyze today's web search results using Google Search to identify the hottest marketing trends in Egypt.
+        Provide a concise summary formatted in markdown. Include the following sections:
+        - A section titled "### 🔥 أهم الهاشتاجات" with a list of 3-4 trending hashtags on Instagram and TikTok.
+        - A section titled "### 🎬 أفكار فيديوهات رائجة" with a list of 3-4 trending video ideas or formats.
+        - A section titled "### 📰 أخبار تسويقية عاجلة" with a list of 2-3 top news items relevant to digital marketers in Egypt.
+        Keep the language in colloquial Egyptian Arabic. Be direct and punchy.
+    `;
+    const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: {
+            tools: [{ googleSearch: {} }],
+        },
+    });
+    return response.text;
+};

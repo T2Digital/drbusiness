@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Prescription, ConsultationData, DetailedPost } from '../types';
 import { LoadingSpinner, DownloadIcon, CopyIcon } from '../components/icons';
+import { forceDownload } from '../utils/helpers';
+import { ImagePreviewModal } from '../components/ImagePreviewModal';
 
 interface PrescriptionPageProps {
   prescription: Prescription | null;
@@ -12,12 +14,26 @@ interface PrescriptionPageProps {
 const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onProceed, error }) => {
     const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('week1');
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+    const [isDownloading, setIsDownloading] = useState<number | null>(null);
 
     const handleCopy = (post: DetailedPost, index: number) => {
         const textToCopy = `${post.caption}\n\n${post.hashtags}`;
         navigator.clipboard.writeText(textToCopy);
         setCopiedPostId(`week1-${index}`);
         setTimeout(() => setCopiedPostId(null), 2000);
+    };
+
+    const handleDownload = async (url: string | undefined, index: number) => {
+        if (!url) return;
+        setIsDownloading(index);
+        try {
+            await forceDownload(url, `drbusiness-post-${index}.png`);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsDownloading(null);
+        }
     };
 
     if (error) {
@@ -80,7 +96,12 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onPro
                                     <div key={index} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
                                         <div className="aspect-square bg-slate-700 flex items-center justify-center">
                                             {post.generatedImage ? 
-                                                <img src={post.generatedImage} alt={post.visualPrompt} className="w-full h-full object-cover"/>
+                                                <img 
+                                                    src={post.generatedImage} 
+                                                    alt={post.visualPrompt} 
+                                                    className="w-full h-full object-cover cursor-pointer"
+                                                    onClick={() => setPreviewImageUrl(post.generatedImage)}
+                                                />
                                                 : 
                                                 <div className="text-center p-4 text-yellow-400">
                                                     <p>لم نتمكن من توليد صورة. يمكنك إنشائها من لوحة التحكم لاحقًا.</p>
@@ -98,9 +119,14 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onPro
                                                 <button onClick={() => handleCopy(post, index)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white font-bold py-2 px-3 rounded-md hover:bg-slate-600 transition">
                                                     <CopyIcon className="w-4 h-4" /> {copiedPostId === `week1-${index}` ? 'اتنسخ!' : 'انسخ المحتوى'}
                                                 </button>
-                                                <a href={post.generatedImage} download={`drbusiness-post-${index}.png`} className={`flex items-center justify-center gap-2 w-full text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition ${!post.generatedImage ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                                    <DownloadIcon className="w-4 h-4" /> تحميل الصورة
-                                                </a>
+                                                <button 
+                                                    onClick={() => handleDownload(post.generatedImage, index)}
+                                                    disabled={!post.generatedImage || isDownloading === index}
+                                                    className={`flex items-center justify-center gap-2 w-full text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition disabled:opacity-50`}
+                                                >
+                                                    {isDownloading === index ? <LoadingSpinner className="w-4 h-4" /> : <DownloadIcon className="w-4 h-4" />}
+                                                    {isDownloading === index ? 'جاري التحميل...' : 'تحميل الصورة'}
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -139,6 +165,13 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onPro
                 </footer>
             </div>
         </div>
+        {previewImageUrl && (
+            <ImagePreviewModal 
+                imageUrl={previewImageUrl} 
+                altText="معاينة تصميم المنشور" 
+                onClose={() => setPreviewImageUrl(null)} 
+            />
+        )}
         </>
     );
 };

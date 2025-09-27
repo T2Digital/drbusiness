@@ -44,3 +44,32 @@ export const generateWhatsAppLink = (phone: string, client: Omit<Client, 'id' | 
     const internationalPhone = `2${phone}`; 
     return `https://wa.me/${internationalPhone}?text=${encodedMessage}`;
 };
+
+/**
+ * Forces a browser download of a file from a URL.
+ * Fetches the resource as a blob and creates a temporary link to trigger the download.
+ * @param imageUrl The URL of the file to download.
+ * @param fileName The desired name for the downloaded file.
+ */
+export const forceDownload = async (imageUrl: string, fileName: string) => {
+    try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+            throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (error) {
+        console.error('Download failed:', error);
+        // Fallback: Open in a new tab if the download fails due to CORS or other issues
+        window.open(imageUrl, '_blank');
+    }
+};

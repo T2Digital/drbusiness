@@ -4,6 +4,8 @@ import { editImageWithPrompt, generateCaptionVariations, generateDetailedWeekPla
 import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, ChartBarIcon, LinkIcon, VideoIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ImageStudioModal } from '../components/ImageStudioModal';
+import { forceDownload } from '../utils/helpers';
+import { ImagePreviewModal } from '../components/ImagePreviewModal';
 
 interface ClientDashboardPageProps {
   client: Client;
@@ -72,7 +74,8 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
         }
 
         setPosts(currentPosts => {
-            const currentPostsMap = new Map(currentPosts.map(p => [p.id, p]));
+            // FIX: Explicitly type the Map to resolve a TypeScript inference issue where `existing` was being typed as `unknown`.
+            const currentPostsMap = new Map<string, PostWithStatus>(currentPosts.map(p => [p.id, p]));
             
             const newPosts = allPrescriptionPosts.map(p => {
                 const existing = currentPostsMap.get(p.id);
@@ -309,6 +312,9 @@ const ContentCalendarView: React.FC<{
     onFetchCaptionIdeas: (p: PostWithStatus) => void, onSchedule: (p: PostWithStatus) => void
 }> = ({ posts, futureWeeks, isGenerating, onGenerateWeek, client, onOpenDesignStudio, onOpenEditModal, onOpenAiEdit, onFetchCaptionIdeas, onSchedule }) => {
     const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+    const [isDownloading, setIsDownloading] = useState<string | null>(null);
+
     const handleCopy = (post: PostWithStatus) => {
         const textToCopy = `${post.caption}\n\n${post.hashtags}`;
         navigator.clipboard.writeText(textToCopy);
@@ -316,59 +322,93 @@ const ContentCalendarView: React.FC<{
         setTimeout(() => setCopiedPostId(null), 2000);
     };
 
-    return <div>
-        <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">تقويم المحتوى</h1>
-        <p className="text-slate-400 mb-8">هنا تجد كل المحتوى الجاهز للنشر مع أدوات التعديل والجدولة.</p>
-         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {posts.map((post) => (
-                <div key={post.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col shadow-lg transition-all duration-300 hover:shadow-teal-500/10">
-                    <div className="aspect-square bg-slate-700 flex items-center justify-center relative group">
-                        {post.isLoading ? <LoadingSpinner className="w-10 h-10 text-slate-500" />
-                        : post.generatedImage ? 
-                        <>
-                            <img src={post.generatedImage} alt={post.visualPrompt} className="w-full h-full object-cover"/>
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => onOpenDesignStudio(post)} title="إعادة تصميم الصورة" className="bg-slate-900/80 text-white p-3 rounded-full hover:bg-slate-900"><BrainCircuitIcon className="w-5 h-5"/></button>
-                                <button onClick={() => onOpenAiEdit(post)} title="تعديل بالذكاء الاصطناعي" className="bg-slate-900/80 text-white p-3 rounded-full hover:bg-slate-900"><Wand2Icon className="w-5 h-5"/></button>
+    const handleDownload = async (url: string | undefined, post: PostWithStatus) => {
+        if (!url) return;
+        setIsDownloading(post.id);
+        try {
+            const fileName = `${client.consultationData.business.name || 'post'}-${post.day}.jpg`;
+            await forceDownload(url, fileName);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsDownloading(null);
+        }
+    };
+
+    return <>
+        <div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">تقويم المحتوى</h1>
+            <p className="text-slate-400 mb-8">هنا تجد كل المحتوى الجاهز للنشر مع أدوات التعديل والجدولة.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {posts.map((post) => (
+                    <div key={post.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col shadow-lg transition-all duration-300 hover:shadow-teal-500/10">
+                        <div className="aspect-square bg-slate-700 flex items-center justify-center relative group">
+                            {post.isLoading ? <LoadingSpinner className="w-10 h-10 text-slate-500" />
+                            : post.generatedImage ? 
+                            <>
+                                <img 
+                                    src={post.generatedImage} 
+                                    alt={post.visualPrompt} 
+                                    className="w-full h-full object-cover cursor-pointer"
+                                    onClick={() => setPreviewImageUrl(post.generatedImage)}
+                                />
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => onOpenDesignStudio(post)} title="إعادة تصميم الصورة" className="bg-slate-900/80 text-white p-3 rounded-full hover:bg-slate-900"><BrainCircuitIcon className="w-5 h-5"/></button>
+                                    <button onClick={() => onOpenAiEdit(post)} title="تعديل بالذكاء الاصطناعي" className="bg-slate-900/80 text-white p-3 rounded-full hover:bg-slate-900"><Wand2Icon className="w-5 h-5"/></button>
+                                </div>
+                            </>
+                            : 
+                            <div className="p-4 text-center">
+                                <button onClick={() => onOpenDesignStudio(post)} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-500 transition flex items-center gap-2">
+                                    <Wand2Icon className="w-5 h-5"/>
+                                    إنشاء تصميم
+                                </button>
+                                <p className="text-xs text-slate-500 mt-2">استخدم الاستوديو الإبداعي</p>
                             </div>
-                        </>
-                        : 
-                        <div className="p-4 text-center">
-                            <button onClick={() => onOpenDesignStudio(post)} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-500 transition flex items-center gap-2">
-                                <Wand2Icon className="w-5 h-5"/>
-                                إنشاء تصميم
-                            </button>
-                            <p className="text-xs text-slate-500 mt-2">استخدم الاستوديو الإبداعي</p>
+                            }
                         </div>
-                        }
-                    </div>
-                    <div className="p-4 flex flex-col flex-grow">
-                        <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-slate-300">{post.day}</span><span className="inline-block bg-blue-500/20 text-blue-300 text-xs font-semibold px-2 py-1 rounded-full">{post.platform}</span></div>
-                        <p className="text-slate-400 text-sm mb-3 h-24 overflow-y-auto p-2 bg-slate-900/50 rounded-md whitespace-pre-wrap">{post.caption}</p>
-                        <p className="text-slate-500 text-xs mb-4 h-12 overflow-y-auto">{post.hashtags}</p>
-                        <div className="mt-auto flex flex-col gap-2">
-                             <button onClick={() => onSchedule(post)} className="w-full flex items-center justify-center gap-2 text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition"><CalendarIcon className="w-4 h-4"/> جدولة المنشور</button>
-                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => onOpenEditModal(post)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition"><EditIcon className="w-4 h-4"/> تعديل</button>
-                                <button onClick={() => onFetchCaptionIdeas(post)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition"><SparklesIcon className="w-4 h-4"/> أفكار</button>
-                                <button onClick={() => handleCopy(post)} className="col-span-2 flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition"><CopyIcon className="w-4 h-4"/> {copiedPostId === post.id ? 'اتنسخ!' : 'نسخ النص'}</button>
-                                <a href={post.generatedImage} download={`${client.consultationData.business.name || 'post'}-${post.day}.jpg`} className={`col-span-2 flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition ${!post.generatedImage ? 'opacity-50 cursor-not-allowed' : ''}`}><DownloadIcon className="w-4 h-4"/> تحميل الصورة</a>
-                             </div>
+                        <div className="p-4 flex flex-col flex-grow">
+                            <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-slate-300">{post.day}</span><span className="inline-block bg-blue-500/20 text-blue-300 text-xs font-semibold px-2 py-1 rounded-full">{post.platform}</span></div>
+                            <p className="text-slate-400 text-sm mb-3 h-24 overflow-y-auto p-2 bg-slate-900/50 rounded-md whitespace-pre-wrap">{post.caption}</p>
+                            <p className="text-slate-500 text-xs mb-4 h-12 overflow-y-auto">{post.hashtags}</p>
+                            <div className="mt-auto flex flex-col gap-2">
+                                <button onClick={() => onSchedule(post)} className="w-full flex items-center justify-center gap-2 text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition"><CalendarIcon className="w-4 h-4"/> جدولة المنشور</button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={() => onOpenEditModal(post)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition"><EditIcon className="w-4 h-4"/> تعديل</button>
+                                    <button onClick={() => onFetchCaptionIdeas(post)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition"><SparklesIcon className="w-4 h-4"/> أفكار</button>
+                                    <button onClick={() => handleCopy(post)} className="col-span-2 flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition"><CopyIcon className="w-4 h-4"/> {copiedPostId === post.id ? 'اتنسخ!' : 'نسخ النص'}</button>
+                                    <button
+                                        onClick={() => handleDownload(post.generatedImage, post)}
+                                        disabled={!post.generatedImage || isDownloading === post.id}
+                                        className={`col-span-2 flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white py-2 px-3 rounded-md hover:bg-slate-600 transition disabled:opacity-50`}
+                                    >
+                                        {isDownloading === post.id ? <LoadingSpinner className="w-4 h-4" /> : <DownloadIcon className="w-4 h-4" />}
+                                        {isDownloading === post.id ? 'جاري التحميل...' : 'تحميل الصورة'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            ))}
-            {futureWeeks.map(week => (
-                <div key={week.week} className="bg-slate-800 rounded-xl border-2 border-dashed border-slate-700 flex flex-col justify-center items-center p-6 text-center hover:border-teal-500 transition">
-                     <h3 className="text-xl font-bold text-white mb-2">أفكار الأسبوع {week.week}</h3>
-                     <p className="text-slate-400 mb-4">{week.summary}</p>
-                     <button onClick={() => onGenerateWeek(week)} disabled={isGenerating.has(week.week)} className="w-full flex items-center justify-center gap-3 bg-slate-700 text-white font-bold py-3 px-6 rounded-full hover:bg-slate-600 transition disabled:opacity-50">
-                        {isGenerating.has(week.week) ? <><LoadingSpinner className="w-5 h-5"/>جاري التجهيز...</> : `🚀 جهّز محتوى هذا الأسبوع`}
-                    </button>
-                </div>
-            ))}
+                ))}
+                {futureWeeks.map(week => (
+                    <div key={week.week} className="bg-slate-800 rounded-xl border-2 border-dashed border-slate-700 flex flex-col justify-center items-center p-6 text-center hover:border-teal-500 transition">
+                        <h3 className="text-xl font-bold text-white mb-2">أفكار الأسبوع {week.week}</h3>
+                        <p className="text-slate-400 mb-4">{week.summary}</p>
+                        <button onClick={() => onGenerateWeek(week)} disabled={isGenerating.has(week.week)} className="w-full flex items-center justify-center gap-3 bg-slate-700 text-white font-bold py-3 px-6 rounded-full hover:bg-slate-600 transition disabled:opacity-50">
+                            {isGenerating.has(week.week) ? <><LoadingSpinner className="w-5 h-5"/>جاري التجهيز...</> : `🚀 جهّز محتوى هذا الأسبوع`}
+                        </button>
+                    </div>
+                ))}
+            </div>
         </div>
-    </div>
+        {previewImageUrl && (
+            <ImagePreviewModal 
+                imageUrl={previewImageUrl} 
+                altText="معاينة تصميم المنشور" 
+                onClose={() => setPreviewImageUrl(null)} 
+            />
+        )}
+    </>;
 };
 
 const AnnualStrategyView: React.FC<{ client: Client }> = ({ client }) => {
@@ -483,12 +523,36 @@ const AnalyticsView: React.FC<{ client: Client }> = ({ client }) => {
 }
 
 const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnections: (c: SocialConnections) => void}> = ({ connections, onUpdateConnections }) => {
-    const socialPlatforms: {key: keyof SocialConnections, name: string, icon: React.FC<any>, url: string}[] = [
-        { key: 'facebook', name: 'Facebook', icon: FacebookIcon, url: 'https://www.facebook.com/login' },
-        { key: 'instagram', name: 'Instagram', icon: InstagramIcon, url: 'https://www.instagram.com/login' },
-        { key: 'tiktok', name: 'TikTok', icon: TikTokIcon, url: 'https://www.tiktok.com/login' },
-        { key: 'x', name: 'X (Twitter)', icon: XIcon, url: 'https://x.com/login' },
-        { key: 'linkedin', name: 'LinkedIn', icon: LinkedinIcon, url: 'https://www.linkedin.com/login' },
+    
+    const getOAuthUrl = (platform: keyof SocialConnections): string => {
+        const REDIRECT_URI = encodeURIComponent('https://drbusiness.vercel.app/callback'); // Placeholder
+        const CLIENT_ID_PLACEHOLDER = 'YOUR_CLIENT_ID'; // Placeholder
+
+        switch (platform) {
+            case 'facebook':
+            case 'instagram': // Instagram uses Facebook's auth
+                const fbScopes = 'pages_show_list,pages_manage_posts,pages_read_engagement,ads_management,business_management,instagram_basic,instagram_content_publish';
+                return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${CLIENT_ID_PLACEHOLDER}&redirect_uri=${REDIRECT_URI}&scope=${fbScopes}&response_type=code`;
+            case 'tiktok':
+                const tkScopes = 'user.info.basic,video.list,video.upload';
+                return `https://www.tiktok.com/auth/authorize?client_key=${CLIENT_ID_PLACEHOLDER}&scope=${tkScopes}&response_type=code&redirect_uri=${REDIRECT_URI}`;
+            case 'x':
+                const xScopes = 'tweet.read tweet.write users.read offline.access';
+                return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${CLIENT_ID_PLACEHOLDER}&redirect_uri=${REDIRECT_URI}&scope=${encodeURIComponent(xScopes)}&state=state&code_challenge=challenge&code_challenge_method=S256`;
+            case 'linkedin':
+                const liScopes = 'r_liteprofile r_emailaddress w_member_social';
+                return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${CLIENT_ID_PLACEHOLDER}&redirect_uri=${REDIRECT_URI}&scope=${encodeURIComponent(liScopes)}`;
+            default:
+                return '#';
+        }
+    };
+
+    const socialPlatforms: {key: keyof SocialConnections, name: string, icon: React.FC<any>}[] = [
+        { key: 'facebook', name: 'Facebook', icon: FacebookIcon },
+        { key: 'instagram', name: 'Instagram', icon: InstagramIcon },
+        { key: 'tiktok', name: 'TikTok', icon: TikTokIcon },
+        { key: 'x', name: 'X (Twitter)', icon: XIcon },
+        { key: 'linkedin', name: 'LinkedIn', icon: LinkedinIcon },
     ];
     
     return <div>
@@ -496,7 +560,7 @@ const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnect
         <p className="text-slate-400 mb-8">قم بربط حسابات العميل لنشر المحتوى مباشرة وإدارة الحملات.</p>
         <div className="bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-lg">
             <div className="space-y-4">
-                {socialPlatforms.map(({ key, name, icon: Icon, url }) => {
+                {socialPlatforms.map(({ key, name, icon: Icon }) => {
                     const isConnected = connections[key];
                     return (
                         <div key={key} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
@@ -514,7 +578,8 @@ const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnect
                                         قطع الاتصال
                                     </button>
                                 ) : (
-                                     <a href={url} target="_blank" rel="noopener noreferrer" className='font-bold py-2 px-4 rounded-md transition bg-teal-600 hover:bg-teal-500'>
+                                     <a href={getOAuthUrl(key)} target="_blank" rel="noopener noreferrer" className='font-bold py-2 px-4 rounded-md transition bg-teal-600 hover:bg-teal-500 flex items-center gap-2'>
+                                        <LinkIcon className="w-4 h-4"/>
                                         اتصال
                                     </a>
                                 )}
@@ -522,7 +587,13 @@ const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnect
                         </div>
                     )
                 })}
-                 <p className="text-center text-xs text-slate-500 pt-4">ملاحظة: الربط الفعلي يتطلب بناء تكامل مع الواجهات البرمجية (APIs) لكل منصة ويتطلب وجود باك إند.</p>
+                 <div className="text-center text-sm text-slate-500 pt-4 bg-slate-900/40 p-4 rounded-lg mt-4">
+                    <h4 className="font-bold text-slate-300">كيف يعمل الاتصال؟</h4>
+                    <p>عند الضغط على "اتصال"، سيتم توجيهك إلى صفحة الصلاحيات الرسمية للمنصة لمنح دكتور بزنس الإذن بالإدارة.
+                    <br/>
+                    <b>ملاحظة فنية:</b> هذه واجهة توضيحية. الربط الفعلي يتطلب بناء تكامل مع الواجهات البرمجية (APIs) لكل منصة ووجود نظام خلفي (Backend) آمن لتخزين صلاحيات الوصول.
+                    </p>
+                </div>
             </div>
         </div>
     </div>

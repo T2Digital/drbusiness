@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BusinessData, MarketingGoals, TargetAudience, ConsultationData } from '../types';
 import { toBase64 } from '../utils/helpers';
-import { Upload, BrainCircuitIcon, UserCircle } from '../components/icons';
+import { Upload, UserCircle } from '../components/icons';
+import { AboutModal } from '../components/AboutModal';
+
 
 interface ConsultationPageProps {
   onSubmit: (data: ConsultationData) => void;
+  onBackToHome: () => void;
+  onLogin: () => void;
 }
 
 type Message = {
@@ -15,7 +19,7 @@ type Message = {
     isFinished?: boolean;
 };
 
-const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
+const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit, onBackToHome, onLogin }) => {
   const [data, setData] = useState<ConsultationData>({
     business: { name: '', field: '', description: '', logo: '', website: '', location: '' },
     goals: { awareness: false, sales: false, leads: false, engagement: true, other: '' },
@@ -25,6 +29,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isAboutModalOpen, setAboutModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -123,8 +128,20 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
   }
   
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 bg-slate-900 animate-fade-in">
-      <div className="w-full max-w-2xl min-h-[70vh] max-h-[85vh] flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
+    <>
+    <div className="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 bg-slate-900 animate-fade-in relative">
+      <header className="absolute top-0 right-0 w-full p-4 z-20">
+        <div className="max-w-2xl mx-auto flex justify-between items-center">
+             <div className="flex items-center gap-4">
+                <button onClick={onBackToHome} className="text-slate-400 hover:text-white transition text-sm font-semibold">الرئيسية</button>
+                <button onClick={() => setAboutModalOpen(true)} className="text-slate-400 hover:text-white transition text-sm font-semibold">مين إحنا</button>
+             </div>
+             <button onClick={onLogin} className="bg-slate-800/50 text-white font-bold py-2 px-5 rounded-full hover:bg-slate-700/70 transition backdrop-blur-sm text-sm">
+                تسجيل الدخول
+            </button>
+        </div>
+      </header>
+      <div className="w-full max-w-2xl min-h-[70vh] max-h-[85vh] flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 mt-16">
         <div className="p-4 border-b border-slate-700 flex items-center gap-3">
           <img src="https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png" alt="Logo" className="w-8 h-8"/>
           <div>
@@ -189,6 +206,8 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit }) => {
         </div>
       </div>
     </div>
+    <AboutModal isOpen={isAboutModalOpen} onClose={() => setAboutModalOpen(false)} />
+    </>
   );
 };
 const goalMap: { [key: string]: string } = { 'الناس كلها تعرفني': 'awareness', 'أبيع أكتر وأكسب فلوس': 'sales', 'أجمع بيانات عملاء مهتمين': 'leads', 'أعمل قلبان على السوشيال ميديا': 'engagement' };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrainCircuitIcon, LoadingSpinner } from '../components/icons';
+import { LoadingSpinner } from '../components/icons';
 import { backendService, LoginResult } from '../services/backendService';
 
 interface LoginPageProps {
@@ -12,6 +12,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBackToHome }) =
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const logoUrl = "https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +41,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onBackToHome }) =
 
       <div className="w-full max-w-md bg-slate-800/50 rounded-2xl shadow-2xl p-8 border border-slate-700 backdrop-blur-sm z-10">
         <div className="text-center mb-8">
-            <BrainCircuitIcon className="w-16 h-16 text-teal-400 mx-auto mb-4" />
+            <img src={logoUrl} alt="Dr. Business Logo" className="w-16 h-16 mx-auto mb-4" />
             <h2 className="text-3xl font-bold text-white">تسجيل الدخول</h2>
             <p className="text-slate-400 mt-2">مرحبًا بك! أدخل بياناتك للوصول إلى لوحة التحكم.</p>
         </div>

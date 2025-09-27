@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AboutModal } from '../components/AboutModal';
+import { TrendingTopics } from '../components/TrendingTopics';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -47,12 +48,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onAdmin }) 
         </main>
       </div>
 
-      <section id="about" className="relative z-10 w-full max-w-4xl p-6 sm:p-8 bg-slate-800/50 rounded-2xl border border-slate-700 backdrop-blur-sm">
+      <section id="about" className="relative z-10 w-full max-w-4xl p-6 sm:p-8 bg-slate-800/50 rounded-2xl border border-slate-700 backdrop-blur-sm mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4 text-white">إيه حكاية دكتور بزنس؟</h2>
           <p className="text-center text-slate-300 leading-relaxed text-sm sm:text-base">
             مش مجرد برنامج، أنا شريكك الذكي في النجاح. بخبرة السوق المصري وقوة الذكاء الاصطناعي، بقدملك "روشتة" تسويق متكاملة... من الفكرة للتنفيذ الفيروسي. جاهز تكسر الدنيا؟
           </p>
       </section>
+
+      <TrendingTopics />
 
       <footer className="relative z-10 text-slate-500 text-xs sm:text-sm mt-12">
         <div className="flex gap-4">
