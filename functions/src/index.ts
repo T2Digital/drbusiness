@@ -1,5 +1,5 @@
 // functions/src/index.ts
-import * as functions from "firebase-functions";
+import {onRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
@@ -17,22 +17,25 @@ const db = admin.firestore();
 const app = express();
 app.use(cors({origin: true}));
 
-// Initialize Gemini AI securely
+// Initialize Gemini AI securely using environment variables
 let ai: GoogleGenAI | null = null;
 try {
-  // Use a try-catch block for local testing where config might not be available
-  const GEMINI_API_KEY = functions.config().gemini.key;
-  if (!GEMINI_API_KEY) {
-    throw new Error("Gemini API key not found in Firebase config.");
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Gemini API key not found. Make sure the API_KEY environment variable is set in your Firebase/Cloud Run environment.");
   }
-  ai = new GoogleGenAI({apiKey: GEMINI_API_KEY});
+  ai = new GoogleGenAI({apiKey});
+  console.log("GoogleGenAI initialized successfully.");
 } catch (e) {
   console.error(
-    "FATAL: Could not initialize GoogleGenAI. Make sure you've set the Gemini API key in your Firebase config by running: firebase functions:config:set gemini.key='YOUR_API_KEY'",
+    "FATAL: Could not initialize GoogleGenAI. This is likely due to a missing or invalid API key.",
     e,
   );
 }
 const textModel = "gemini-2.5-flash";
+const imageModel = "imagen-4.0-generate-001";
+
 
 // --- API: AUTH ENDPOINTS ---
 app.post("/auth/login", async (req, res) => {
@@ -153,7 +156,7 @@ You must strictly adhere to the business details provided in the prompt and not 
 `;
 
 app.post("/ai/generatePrescription", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
+  if (!ai) return res.status(500).json({message: "AI service not initialized. Check server logs for API key errors."});
   const {consultationData}: {consultationData: ConsultationData} = req.body;
 
   const businessContext = `
@@ -165,6 +168,7 @@ app.post("/ai/generatePrescription", async (req, res) => {
   `;
 
   try {
+    // Step 1: Generate all text content in parallel
     const [week1Response, futureWeeksResponse, strategyResponse] = await Promise.all([
       ai.models.generateContent({
         model: textModel,
@@ -239,16 +243,47 @@ app.post("/ai/generatePrescription", async (req, res) => {
       }),
     ]);
 
+    // Step 2: Parse text results
     const week1Plan: DetailedPost[] = JSON.parse(week1Response.text);
+    const strategy = JSON.parse(strategyResponse.text);
+    const futureWeeksPlan = JSON.parse(futureWeeksResponse.text);
+
+    // Step 3: Generate images for the first week's posts in parallel
+    const imageGenerationPromises = week1Plan.map((post) => {
+      if (post.visualPrompt && post.visualPrompt.trim() !== "") {
+        return ai!.models.generateImages({
+          model: imageModel,
+          prompt: post.visualPrompt,
+          config: {numberOfImages: 1, outputMimeType: "image/png"},
+        }).then((imageResponse) => {
+          if (imageResponse.generatedImages?.[0]?.image?.imageBytes) {
+            const imageBase64 = imageResponse.generatedImages[0].image.imageBytes;
+            post.generatedImage = `data:image/png;base64,${imageBase64}`;
+          } else {
+            post.generatedImage = "";
+          }
+        }).catch((err) => {
+          console.error(`Image generation failed for prompt: "${post.visualPrompt}"`, err);
+          post.generatedImage = "";
+        });
+      }
+      return Promise.resolve();
+    });
+
+    await Promise.all(imageGenerationPromises);
+
+
+    // Step 4: Assemble the final prescription
     const finalPrescription: Prescription = {
-      strategy: JSON.parse(strategyResponse.text),
-      week1Plan: week1Plan,
-      futureWeeksPlan: JSON.parse(futureWeeksResponse.text),
+      strategy,
+      week1Plan,
+      futureWeeksPlan,
     };
     return res.status(200).json(finalPrescription);
   } catch (error) {
     console.error("Error in /ai/generatePrescription:", error);
-    return res.status(500).json({message: "Failed to generate prescription."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return res.status(500).json({message: `Failed to generate prescription. Details: ${errorMessage}`});
   }
 });
 
@@ -376,19 +411,28 @@ app.post("/ai/enhanceVisualPrompt", async (req, res) => {
 app.get("/ai/getTrendingTopics", async (_req, res) => {
   if (!ai) return res.status(500).json({message: "AI service not initialized."});
   try {
-      const prompt = "What are the top 3 trending marketing topics and social media trends in Egypt right now for small businesses? Present them as a short, engaging markdown list, with each main topic as a level 3 heading (###).";
-      const response = await ai.models.generateContent({
-          model: textModel, contents: prompt,
-          config: {systemInstruction: DR_BUSINESS_PERSONA_PROMPT},
-      });
-      return res.status(200).json({text: response.text});
+    const prompt = "What are the top 3 trending marketing topics and social media trends in Egypt right now for small businesses? Present them as a short, engaging markdown list, with each main topic as a level 3 heading (###).";
+    const response = await ai.models.generateContent({
+      model: textModel,
+      contents: prompt,
+      config: {
+        systemInstruction: DR_BUSINESS_PERSONA_PROMPT,
+        tools: [{googleSearch: {}}],
+      },
+    });
+    return res.status(200).json({text: response.text});
   } catch (error) {
-      console.error("Error in /ai/getTrendingTopics:", error);
-      return res.status(500).json({message: "Failed to fetch trending topics."});
+    console.error("Error in /ai/getTrendingTopics:", error);
+    return res.status(500).json({message: "Failed to fetch trending topics."});
   }
 });
 
 
 // --- EXPORT API ---
-// FIX: Cast express app to 'any' to resolve a common type mismatch issue between Express and Firebase Functions v1 SDK.
-export const api = functions.https.onRequest(app as any);
+// Use v2 onRequest with updated runtime options for timeout and memory.
+// This is crucial for long-running AI tasks.
+export const api = onRequest({
+    timeoutSeconds: 300, // 5 minutes
+    memory: "1GiB",
+    secrets: ["API_KEY"], // Tell the function to access the secret
+}, app);
