@@ -1,5 +1,6 @@
 // functions/src/index.ts
 import {onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
@@ -9,32 +10,36 @@ import {
   DetailedPost,
   Prescription,
   SimplePost,
-} from "../../src/types"; // Import types from frontend
+} from "../../src/types";
+// FIX: Import Buffer to resolve "Cannot find name 'Buffer'" error.
+import { Buffer } from "buffer";
 
 // --- INITIALIZATION ---
 admin.initializeApp();
 const db = admin.firestore();
 const app = express();
 app.use(cors({origin: true}));
+app.use(express.json({limit: "10mb"})); // Increase limit for image data
 
-// Initialize Gemini AI securely using environment variables
+const geminiApiKey = defineSecret("API_KEY");
+
+// --- LAZY AI INITIALIZATION ---
 let ai: GoogleGenAI | null = null;
-try {
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Gemini API key not found. Make sure the API_KEY environment variable is set in your Firebase/Cloud Run environment.");
+const getAi = (): GoogleGenAI => {
+  if (!ai) {
+    const apiKey = geminiApiKey.value();
+    if (!apiKey) {
+      throw new Error("Gemini API key secret is not available. Ensure the secret is set and the function has permissions to access it.");
+    }
+    ai = new GoogleGenAI({apiKey});
   }
-  ai = new GoogleGenAI({apiKey});
-  console.log("GoogleGenAI initialized successfully.");
-} catch (e) {
-  console.error(
-    "FATAL: Could not initialize GoogleGenAI. This is likely due to a missing or invalid API key.",
-    e,
-  );
-}
+  return ai;
+};
+
 const textModel = "gemini-2.5-flash";
 const imageModel = "imagen-4.0-generate-001";
+const videoModel = "veo-2.0-generate-001";
+const imageEditModel = "gemini-2.5-flash-image-preview";
 
 
 // --- API: AUTH ENDPOINTS ---
@@ -43,33 +48,27 @@ app.post("/auth/login", async (req, res) => {
   if (!email) {
     return res.status(400).json({message: "Email is required."});
   }
-
   try {
     const clientsRef = db.collection("clients");
     const snapshot = await clientsRef.where("email", "==", email.toLowerCase()).limit(1).get();
-
     if (snapshot.empty) {
       return res.status(404).json({message: "الإيميل أو الباسورد فيهم حاجة غلط. حاول تاني."});
     }
-
     const clientDoc = snapshot.docs[0];
     const client = clientDoc.data();
-
     if (client.status === "pending") {
       return res.status(403).json({message: "حسابك لسه بيتراجع. فريقنا هيفعله وهيبعتلك إشعار أول ما يخلص."});
     }
-
     return res.status(200).json({role: "client", clientId: client.id});
   } catch (error) {
     console.error("Login error:", error);
-    return res.status(500).json({message: "Server error during login."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `حدث خطأ في الخادم أثناء تسجيل الدخول: ${errorMessage}`});
   }
 });
 
 
 // --- API: CLIENTS (CRUD) ENDPOINTS ---
-
-// GET all clients
 app.get("/clients", async (_req, res) => {
   try {
     const snapshot = await db.collection("clients").get();
@@ -78,11 +77,11 @@ app.get("/clients", async (_req, res) => {
     return res.status(200).json(clients);
   } catch (error) {
     console.error("Error getting clients:", error);
-    return res.status(500).json({message: "Could not fetch clients."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `لم نتمكن من جلب العملاء: ${errorMessage}`});
   }
 });
 
-// GET a single client by ID
 app.get("/clients/:id", async (req, res) => {
   try {
     const doc = await db.collection("clients").doc(req.params.id).get();
@@ -92,11 +91,11 @@ app.get("/clients/:id", async (req, res) => {
     return res.status(200).json({id: doc.id, ...doc.data()});
   } catch (error) {
     console.error("Error getting client:", error);
-    return res.status(500).json({message: "Could not fetch client."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `لم نتمكن من جلب العميل: ${errorMessage}`});
   }
 });
 
-// CREATE a new client
 app.post("/clients", async (req, res) => {
   try {
     const {regDetails, consultationData, prescription, selectedPackage} = req.body;
@@ -114,11 +113,11 @@ app.post("/clients", async (req, res) => {
     return res.status(201).json({id: docRef.id, ...newClient});
   } catch (error) {
     console.error("Error creating client:", error);
-    return res.status(500).json({message: "Could not create client."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `فشل إنشاء العميل: ${errorMessage}`});
   }
 });
 
-// UPDATE a client
 app.put("/clients/:id", async (req, res) => {
   try {
     const clientRef = db.collection("clients").doc(req.params.id);
@@ -127,11 +126,11 @@ app.put("/clients/:id", async (req, res) => {
     return res.status(200).json({id: req.params.id, ...clientData});
   } catch (error) {
     console.error("Error updating client:", error);
-    return res.status(500).json({message: "Could not update client."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `فشل تحديث العميل: ${errorMessage}`});
   }
 });
 
-// ACTIVATE a client
 app.post("/clients/:id/activate", async (req, res) => {
   try {
     const clientRef = db.collection("clients").doc(req.params.id);
@@ -139,7 +138,8 @@ app.post("/clients/:id/activate", async (req, res) => {
     return res.status(200).json({success: true, message: "Client activated."});
   } catch (error) {
     console.error("Error activating client:", error);
-    return res.status(500).json({message: "Could not activate client."});
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `فشل تفعيل العميل: ${errorMessage}`});
   }
 });
 
@@ -156,283 +156,284 @@ You must strictly adhere to the business details provided in the prompt and not 
 `;
 
 app.post("/ai/generatePrescription", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized. Check server logs for API key errors."});
-  const {consultationData}: {consultationData: ConsultationData} = req.body;
-
-  const businessContext = `
-      - Business Name: ${consultationData.business.name}
-      - Field: ${consultationData.business.field}
-      - Description: ${consultationData.business.description}
-      - Target Audience: ${consultationData.audience.description}
-      - Goals: ${Object.entries(consultationData.goals).filter(([, v]) => v).map(([k]) => k).join(", ")}
-  `;
-
   try {
-    // Step 1: Generate all text content in parallel
-    const [week1Response, futureWeeksResponse, strategyResponse] = await Promise.all([
-      ai.models.generateContent({
-        model: textModel,
-        contents: `Based on this business profile:\n${businessContext}\nGenerate a detailed social media plan for the FIRST WEEK ONLY. Create exactly 7 posts (Sunday to Saturday). For each, provide: A powerful ARABIC caption with a strong hook and CTA. Relevant ARABIC hashtags. A detailed, artistic visual prompt in ENGLISH with NO spelling mistakes. The post's platform and type.`,
-        config: {
-          systemInstruction: DR_BUSINESS_PERSONA_PROMPT,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                day: {type: Type.STRING},
-                platform: {type: Type.STRING},
-                postType: {type: Type.STRING},
-                caption: {type: Type.STRING},
-                hashtags: {type: Type.STRING},
-                visualPrompt: {type: Type.STRING},
-              },
-              required: ["day", "platform", "postType", "caption", "hashtags", "visualPrompt"],
-            },
-          },
-        },
-      }),
-      ai.models.generateContent({
-        model: textModel,
-        contents: `Based on the same business profile:\n${businessContext}\nGenerate a summary and simple post ideas for the next three weeks (Week 2, 3, 4). For each week, provide a one-sentence strategic summary and 3-4 simple, creative post ideas (day, platform, idea) in ARABIC.`,
-        config: {
-          systemInstruction: DR_BUSINESS_PERSONA_PROMPT,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                week: {type: Type.INTEGER},
-                summary: {type: Type.STRING},
-                posts: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      day: {type: Type.STRING},
-                      platform: {type: Type.STRING},
-                      idea: {type: Type.STRING},
-                    },
-                    required: ["day", "platform", "idea"],
-                  },
-                },
-              },
-              required: ["week", "summary", "posts"],
-            },
-          },
-        },
-      }),
-      ai.models.generateContent({
-        model: textModel,
-        contents: `Based on the same business profile:\n${businessContext}\nCreate a high-level, concise viral marketing strategy. Provide a catchy, powerful title, a one-paragraph persuasive summary, and 3-5 clear, actionable strategic steps, all in ARABIC.`,
-        config: {
-          systemInstruction: DR_BUSINESS_PERSONA_PROMPT,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: {type: Type.STRING},
-              summary: {type: Type.STRING},
-              steps: {type: Type.ARRAY, items: {type: Type.STRING}},
-            },
-            required: ["title", "summary", "steps"],
-          },
-        },
-      }),
-    ]);
+    const aiInstance = getAi();
+    const {consultationData}: {consultationData: ConsultationData} = req.body;
 
-    // Step 2: Parse text results
-    const week1Plan: DetailedPost[] = JSON.parse(week1Response.text);
-    const strategy = JSON.parse(strategyResponse.text);
-    const futureWeeksPlan = JSON.parse(futureWeeksResponse.text);
+    const businessContext = `
+        - Business Name: ${consultationData.business.name}
+        - Field: ${consultationData.business.field}
+        - Description: ${consultationData.business.description}
+        - Target Audience: ${consultationData.audience.description}
+        - Goals: ${Object.entries(consultationData.goals).filter(([, v]) => v).map(([k]) => k).join(", ")}
+    `;
 
-    // Step 3: Generate images for the first week's posts in parallel
-    const imageGenerationPromises = week1Plan.map((post) => {
-      if (post.visualPrompt && post.visualPrompt.trim() !== "") {
-        return ai!.models.generateImages({
-          model: imageModel,
-          prompt: post.visualPrompt,
-          config: {numberOfImages: 1, outputMimeType: "image/png"},
-        }).then((imageResponse) => {
-          if (imageResponse.generatedImages?.[0]?.image?.imageBytes) {
-            const imageBase64 = imageResponse.generatedImages[0].image.imageBytes;
-            post.generatedImage = `data:image/png;base64,${imageBase64}`;
-          } else {
-            post.generatedImage = "";
-          }
-        }).catch((err) => {
-          console.error(`Image generation failed for prompt: "${post.visualPrompt}"`, err);
-          post.generatedImage = "";
-        });
-      }
-      return Promise.resolve();
+    // FIX: Refactored Promise.all to sequential awaits to resolve a suspected TypeScript parser/scope issue.
+    const week1Response = await aiInstance.models.generateContent({
+      model: textModel,
+      contents: `Based on this business profile:\n${businessContext}\nGenerate a detailed social media plan for the FIRST WEEK ONLY. Create exactly 7 posts (Sunday to Saturday). For each, provide: A powerful ARABIC caption with a strong hook and CTA. Relevant ARABIC hashtags. A detailed, artistic visual prompt in ENGLISH with NO spelling mistakes. The post's platform and type.`,
+      config: {systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: {type: Type.ARRAY, items: {type: Type.OBJECT, properties: {day: {type: Type.STRING}, platform: {type: Type.STRING}, postType: {type: Type.STRING}, caption: {type: Type.STRING}, hashtags: {type: Type.STRING}, visualPrompt: {type: Type.STRING}}, required: ["day", "platform", "postType", "caption", "hashtags", "visualPrompt"]}}},
     });
 
-    await Promise.all(imageGenerationPromises);
+    const futureWeeksResponse = await aiInstance.models.generateContent({
+      model: textModel,
+      contents: `Based on the same business profile:\n${businessContext}\nGenerate a summary and simple post ideas for the next three weeks (Week 2, 3, 4). For each week, provide a one-sentence strategic summary and 3-4 simple, creative post ideas (day, platform, idea) in ARABIC.`,
+      config: {systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: {type: Type.ARRAY, items: {type: Type.OBJECT, properties: {week: {type: Type.INTEGER}, summary: {type: Type.STRING}, posts: {type: Type.ARRAY, items: {type: Type.OBJECT, properties: {day: {type: Type.STRING}, platform: {type: Type.STRING}, idea: {type: Type.STRING}}, required: ["day", "platform", "idea"]}}}}, required: ["week", "summary", "posts"]}}},
+    });
 
+    const strategyResponse = await aiInstance.models.generateContent({
+      model: textModel,
+      contents: `Based on the same business profile:\n${businessContext}\nCreate a high-level, concise viral marketing strategy. Provide a catchy, powerful title, a one-paragraph persuasive summary, and 3-5 clear, actionable strategic steps, all in ARABIC.`,
+      config: {systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: {type: Type.OBJECT, properties: {title: {type: Type.STRING}, summary: {type: Type.STRING}, steps: {type: Type.ARRAY, items: {type: Type.STRING}}}, required: ["title", "summary", "steps"]}},
+    });
 
-    // Step 4: Assemble the final prescription
-    const finalPrescription: Prescription = {
+    const week1Plan: DetailedPost[] = JSON.parse(week1Response.text);
+    const futureWeeksPlan = JSON.parse(futureWeeksResponse.text);
+    const strategy = JSON.parse(strategyResponse.text);
+
+    const imagePromises = week1Plan.map((post) =>
+      aiInstance.models.generateImages({
+        model: imageModel,
+        prompt: post.visualPrompt,
+        config: {numberOfImages: 1, outputMimeType: "image/png"},
+      }).catch((e) => {
+        console.error(`Image generation failed for prompt: "${post.visualPrompt}"`, e);
+        return null;
+      })
+    );
+
+    const imageResults = await Promise.all(imagePromises);
+
+    const week1PlanWithImages = week1Plan.map((post, index) => {
+      const result = imageResults[index];
+      if (result && result.generatedImages[0]?.image.imageBytes) {
+        return {
+          ...post,
+          generatedImage: `data:image/png;base64,${result.generatedImages[0].image.imageBytes}`,
+        };
+      }
+      return post;
+    });
+
+    const prescription: Prescription = {
       strategy,
-      week1Plan,
+      week1Plan: week1PlanWithImages,
       futureWeeksPlan,
     };
-    return res.status(200).json(finalPrescription);
+
+    return res.status(200).json(prescription);
   } catch (error) {
-    console.error("Error in /ai/generatePrescription:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-    return res.status(500).json({message: `Failed to generate prescription. Details: ${errorMessage}`});
+    console.error("Error generating prescription:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+    return res.status(500).json({message: `فشل إنشاء الروشتة: ${errorMessage}`});
   }
 });
 
 app.post("/ai/generateDetailedWeekPlan", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  const {consultationData, posts}: {consultationData: ConsultationData, posts: SimplePost[]} = req.body;
-  
-  const prompt = `
-      Business Profile:\n- Name: ${consultationData.business.name}\n- Field: ${consultationData.business.field}\n- Audience: ${consultationData.audience.description}\n
-      Simple Post Ideas for the week:\n${posts.map((p) => `- ${p.day} on ${p.platform}: ${p.idea}`).join("\n")}\n
-      Based STRICTLY on the business profile and the ideas above, expand them into a detailed social media plan.
-      For each idea, generate: 1. An ARABIC caption with a strong hook and clear CTA. 2. Relevant ARABIC hashtags. 3. A detailed, artistic visual prompt in ENGLISH with NO spelling mistakes. 4. A suitable 'postType'.
-      Return the response as a JSON array.`;
-   try {
-      const response = await ai.models.generateContent({
-          model: textModel, contents: prompt,
-          config: {
-              systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json",
-              responseSchema: {
-                  type: Type.ARRAY,
-                  items: {
-                      type: Type.OBJECT,
-                      properties: {day: {type: Type.STRING}, platform: {type: Type.STRING}, postType: {type: Type.STRING}, caption: {type: Type.STRING}, hashtags: {type: Type.STRING}, visualPrompt: {type: Type.STRING}},
-                      required: ["day", "platform", "postType", "caption", "hashtags", "visualPrompt"],
-                  },
-              },
-          },
-      });
-      const detailedPosts: DetailedPost[] = JSON.parse(response.text);
-      return res.status(200).json(detailedPosts);
-  } catch (error) {
-      console.error("Error in /ai/generateDetailedWeekPlan:", error);
-      return res.status(500).json({message: "Failed to generate week plan."});
-  }
+    try {
+        const aiInstance = getAi();
+        const { consultationData, posts }: { consultationData: ConsultationData; posts: SimplePost[] } = req.body;
+        const response = await aiInstance.models.generateContent({
+            model: textModel,
+            contents: `Business Profile: ${consultationData.business.name} - ${consultationData.business.description}. Based on these simple ideas: ${JSON.stringify(posts)}. For each idea, generate a detailed post: powerful ARABIC caption, ARABIC hashtags, and a detailed ENGLISH visual prompt.`,
+            config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, platform: { type: Type.STRING }, postType: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.STRING }, visualPrompt: { type: Type.STRING } }, required: ["day", "platform", "postType", "caption", "hashtags", "visualPrompt"] } } },
+        });
+        const detailedPosts = JSON.parse(response.text);
+        return res.status(200).json(detailedPosts);
+    } catch (error) {
+        console.error("Error in generateDetailedWeekPlan:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل إنشاء خطة الأسبوع: ${errorMessage}` });
+    }
 });
 
 app.post("/ai/generateCaptionVariations", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  const {originalCaption, businessContext} = req.body;
-  try {
-      const prompt = `Business Context: ${businessContext}\nOriginal Caption: "${originalCaption}"\n\nGenerate 3 alternative, more engaging captions in ARABIC based on the original.`;
-      const response = await ai.models.generateContent({
-          model: textModel, contents: prompt,
-          config: {
-              systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json",
-              responseSchema: {type: Type.OBJECT, properties: {variations: {type: Type.ARRAY, items: {type: Type.STRING}}}, required: ["variations"]},
-          },
-      });
-      return res.status(200).json(JSON.parse(response.text));
-  } catch (error) {
-      console.error("Error in /ai/generateCaptionVariations:", error);
-      return res.status(500).json({message: "Failed to generate variations."});
-  }
+    try {
+        const aiInstance = getAi();
+        const { originalCaption, businessContext } = req.body;
+        const response = await aiInstance.models.generateContent({
+            model: textModel,
+            contents: `Business context: ${businessContext}. Original caption: "${originalCaption}". Generate 3 distinct, powerful alternative captions in ARABIC. They should vary in tone (e.g., one professional, one witty, one direct).`,
+            config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { variations: { type: Type.ARRAY, items: { type: Type.STRING } } } } },
+        });
+        return res.status(200).json(JSON.parse(response.text));
+    } catch (error) {
+        console.error("Error generating caption variations:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل إنشاء الكابشن: ${errorMessage}` });
+    }
 });
 
 app.post("/ai/elaborateOnStrategyStep", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  const {businessContext, step} = req.body;
-  try {
-      const prompt = `Business Context: ${businessContext}\n\nStrategic Step: "${step}"\n\nElaborate on this strategic step in ARABIC. Provide a detailed, actionable explanation with examples, formatted in markdown. Use bolding for emphasis.`;
-      const response = await ai.models.generateContent({model: textModel, contents: prompt, config: {systemInstruction: DR_BUSINESS_PERSONA_PROMPT}});
-      return res.status(200).json({text: response.text});
-  } catch (error) {
-      console.error("Error in /ai/elaborateOnStrategyStep:", error);
-      return res.status(500).json({message: "Failed to elaborate on step."});
-  }
+    try {
+        const aiInstance = getAi();
+        const { businessContext, step } = req.body;
+        const response = await aiInstance.models.generateContent({
+            model: textModel,
+            contents: `Business context: ${businessContext}. Elaborate on this strategic step: "${step}". Provide a detailed, actionable explanation in ARABIC, using markdown for formatting (like **bold** and lists).`,
+            config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT },
+        });
+        return res.status(200).json({ text: response.text });
+    } catch (error) {
+        console.error("Error elaborating on strategy step:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل شرح الخطوة: ${errorMessage}` });
+    }
 });
 
 app.post("/ai/generateAnalyticsData", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  const {businessContext} = req.body;
-  try {
-      const prompt = `Business Context: ${businessContext}\n\nGenerate realistic but mock analytics data for a social media dashboard. Provide numbers for follower growth (value and trend %), engagement rate (value and trend %), and reach (value and trend %). Also provide 7 numbers for weekly performance (Sunday to Saturday) as percentages from 0 to 100.`;
-      const response = await ai.models.generateContent({
-          model: textModel, contents: prompt,
-          config: {
-              systemInstruction: "You are an analytics data generator. Only return a JSON object, no other text.", responseMimeType: "application/json",
-              responseSchema: {type: Type.OBJECT, properties: {followerGrowth: {type: Type.OBJECT, properties: {value: {type: Type.INTEGER}, trend: {type: Type.NUMBER}}, required: ["value", "trend"]}, engagementRate: {type: Type.OBJECT, properties: {value: {type: Type.NUMBER}, trend: {type: Type.NUMBER}}, required: ["value", "trend"]}, reach: {type: Type.OBJECT, properties: {value: {type: Type.INTEGER}, trend: {type: Type.NUMBER}}, required: ["value", "trend"]}, weeklyPerformance: {type: Type.ARRAY, items: {type: Type.NUMBER}}}, required: ["followerGrowth", "engagementRate", "reach", "weeklyPerformance"]},
-          },
-      });
-      return res.status(200).json(JSON.parse(response.text));
-  } catch (error) {
-      console.error("Error in /ai/generateAnalyticsData:", error);
-      return res.status(500).json({message: "Failed to generate analytics data."});
-  }
+    try {
+        const aiInstance = getAi();
+        const { businessContext } = req.body;
+        const response = await aiInstance.models.generateContent({
+            model: textModel,
+            contents: `For a business like this: ${businessContext}, generate realistic but MOCK social media analytics data for a dashboard. Provide follower growth (value, trend), engagement rate (value, trend), reach (value, trend), and weekly performance (an array of 7 numbers from 0-100 for Sun-Sat).`,
+            config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { followerGrowth: { type: Type.OBJECT, properties: { value: { type: Type.INTEGER }, trend: { type: Type.NUMBER } } }, engagementRate: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, trend: { type: Type.NUMBER } } }, reach: { type: Type.OBJECT, properties: { value: { type: Type.INTEGER }, trend: { type: Type.NUMBER } } }, weeklyPerformance: { type: Type.ARRAY, items: { type: Type.INTEGER } } } } },
+        });
+        return res.status(200).json(JSON.parse(response.text));
+    } catch (error) {
+        console.error("Error generating analytics data:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل إنشاء التحليلات: ${errorMessage}` });
+    }
 });
 
 app.post("/ai/editImageWithPrompt", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  const {base64ImageData, mimeType, prompt} = req.body;
-  try {
-      const imagePart = {inlineData: {data: base64ImageData, mimeType}};
-      const textPart = {text: prompt};
-      const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image-preview", contents: {parts: [imagePart, textPart]},
-          config: {responseModalities: [Modality.IMAGE, Modality.TEXT]},
-      });
-      const imagePartResponse = response.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
-      if (imagePartResponse?.inlineData) {
-          const newBase64 = imagePartResponse.inlineData.data;
-          const imageUrl = `data:${imagePartResponse.inlineData.mimeType};base64,${newBase64}`;
-          return res.status(200).json({imageUrl});
-      } else {
-          throw new Error("AI did not return an image.");
-      }
-  } catch (error) {
-      console.error("Error in /ai/editImageWithPrompt:", error);
-      return res.status(500).json({message: "Failed to edit image."});
-  }
+    try {
+        const aiInstance = getAi();
+        const { base64ImageData, mimeType, prompt } = req.body;
+        const response = await aiInstance.models.generateContent({
+            model: imageEditModel,
+            contents: { parts: [{ inlineData: { data: base64ImageData, mimeType } }, { text: prompt }] },
+            config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+        });
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                return res.status(200).json({ imageUrl });
+            }
+        }
+        throw new Error("AI did not return an image.");
+    } catch (error) {
+        console.error("Error editing image:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل تعديل الصورة: ${errorMessage}` });
+    }
 });
 
 app.post("/ai/enhanceVisualPrompt", async (req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  const {prompt} = req.body;
-  try {
-      const enhancePrompt = `You are a creative visual director. Enhance the following user prompt to make it more detailed, artistic, and effective for an AI image generator. Add details about style, lighting, composition, and mood. The output should ONLY be the enhanced prompt text, nothing else. Original prompt: "${prompt}"`;
-      const response = await ai.models.generateContent({model: textModel, contents: enhancePrompt, config: {systemInstruction: DR_BUSINESS_PERSONA_PROMPT}});
-      return res.status(200).json({text: response.text});
-  } catch (error) {
-      console.error("Error in /ai/enhanceVisualPrompt:", error);
-      return res.status(500).json({message: "Failed to enhance prompt."});
-  }
+    try {
+        const aiInstance = getAi();
+        const { prompt } = req.body;
+        const response = await aiInstance.models.generateContent({
+            model: textModel,
+            contents: `Enhance this visual prompt for an AI image generator to be more artistic, detailed, and professional. Keep the core concept but add cinematic and stylistic elements. Your response must ONLY be the enhanced prompt in ENGLISH. Original prompt: "${prompt}"`,
+        });
+        return res.status(200).json({ text: response.text });
+    } catch (error) {
+        console.error("Error enhancing prompt:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل تحسين الوصف: ${errorMessage}` });
+    }
 });
 
 app.get("/ai/getTrendingTopics", async (_req, res) => {
-  if (!ai) return res.status(500).json({message: "AI service not initialized."});
-  try {
-    const prompt = "What are the top 3 trending marketing topics and social media trends in Egypt right now for small businesses? Present them as a short, engaging markdown list, with each main topic as a level 3 heading (###).";
-    const response = await ai.models.generateContent({
-      model: textModel,
-      contents: prompt,
-      config: {
-        systemInstruction: DR_BUSINESS_PERSONA_PROMPT,
-        tools: [{googleSearch: {}}],
-      },
-    });
-    return res.status(200).json({text: response.text});
-  } catch (error) {
-    console.error("Error in /ai/getTrendingTopics:", error);
-    return res.status(500).json({message: "Failed to fetch trending topics."});
-  }
+    try {
+        const aiInstance = getAi();
+        const response = await aiInstance.models.generateContent({
+            model: textModel,
+            contents: "What are the top 3 trending topics in Egypt right now across different categories (e.g., News, Entertainment, Technology)? For each category, list the main topic and 2-3 related sub-points. Format the response in ARABIC using markdown with '###' for categories.",
+            config: { tools: [{ googleSearch: {} }] },
+        });
+        return res.status(200).json({ text: response.text });
+    } catch (error) {
+        console.error("Error getting trending topics:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل جلب الترندات: ${errorMessage}` });
+    }
+});
+
+app.post("/ai/generateImage", async (req, res) => {
+    try {
+        const aiInstance = getAi();
+        const { prompt } = req.body;
+        const response = await aiInstance.models.generateImages({
+            model: imageModel,
+            prompt: prompt,
+            config: { numberOfImages: 1, outputMimeType: 'image/png' },
+        });
+        const imageBase64 = response.generatedImages[0].image.imageBytes;
+        return res.status(200).json({ imageBase64: `data:image/png;base64,${imageBase64}` });
+    } catch (error) {
+        console.error("Error generating image:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل إنشاء الصورة: ${errorMessage}` });
+    }
+});
+
+app.post("/ai/generateVideo", async (req, res) => {
+    try {
+        const aiInstance = getAi();
+        const { prompt, image } = req.body;
+        const operation = await aiInstance.models.generateVideos({
+            model: videoModel,
+            prompt,
+            image: image || undefined,
+            config: { numberOfVideos: 1 },
+        });
+        return res.status(200).json(operation);
+    } catch (error) {
+        console.error("Error starting video generation:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل بدء إنشاء الفيديو: ${errorMessage}` });
+    }
+});
+
+app.post("/ai/getVideoOperationStatus", async (req, res) => {
+    try {
+        const aiInstance = getAi();
+        const { operation } = req.body;
+        const status = await aiInstance.operations.getVideosOperation({ operation });
+        return res.status(200).json(status);
+    } catch (error) {
+        console.error("Error checking video status:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        return res.status(500).json({ message: `فشل التحقق من حالة الفيديو: ${errorMessage}` });
+    }
+});
+
+app.get("/ai/getVideo", async (req, res) => {
+    const videoUri = req.query.uri as string;
+    if (!videoUri) {
+        return res.status(400).send("Video URI is required.");
+    }
+    try {
+        const apiKey = geminiApiKey.value();
+        const videoUrl = `${videoUri}&key=${apiKey}`;
+        const response = await fetch(videoUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch video: ${response.statusText}`);
+        }
+        res.setHeader("Content-Type", response.headers.get("Content-Type") || "video/mp4");
+        res.setHeader("Content-Length", response.headers.get("Content-Length") || "");
+        
+        const videoBuffer = await response.arrayBuffer();
+        res.send(Buffer.from(videoBuffer));
+    } catch (error) {
+        console.error("Error proxying video download:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown server error occurred.";
+        res.status(500).send(`Failed to download video: ${errorMessage}`);
+    }
 });
 
 
-// --- EXPORT API ---
-// Use v2 onRequest with updated runtime options for timeout and memory.
-// This is crucial for long-running AI tasks.
-export const api = onRequest({
-    timeoutSeconds: 300, // 5 minutes
+// --- EXPORT THE API ---
+export const api = onRequest(
+  {
     memory: "1GiB",
-    secrets: ["API_KEY"], // Tell the function to access the secret
-}, app);
+    timeoutSeconds: 300,
+    secrets: [geminiApiKey],
+    cpu: 2,
+  },
+  app,
+);

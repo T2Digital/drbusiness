@@ -1,4 +1,4 @@
-import { AnalyticsData, ConsultationData, DetailedPost, Prescription, SimplePost } from '../types';
+import { AnalyticsData, ConsultationData, DetailedPost, Prescription, SimplePost, VideoOperation } from '../types';
 import { apiFetch } from './backendService'; 
 
 /**
@@ -61,9 +61,11 @@ export const generateAnalyticsData = async (businessContext: string): Promise<An
  * Edits an image by calling the secure backend endpoint.
  */
 export const editImageWithPrompt = async (base64ImageData: string, mimeType: string, prompt: string): Promise<string> => {
+    // remove data:image/...;base64, prefix if it exists
+    const b64Data = base64ImageData.split(',')[1] || base64ImageData;
     const { imageUrl } = await apiFetch('/ai/editImageWithPrompt', {
         method: 'POST',
-        body: JSON.stringify({ base64ImageData, mimeType, prompt }),
+        body: JSON.stringify({ base64ImageData: b64Data, mimeType, prompt }),
     });
     return imageUrl;
 };
@@ -85,4 +87,24 @@ export const enhanceVisualPrompt = async (prompt: string): Promise<string> => {
 export const getTrendingTopics = async (): Promise<string> => {
     const { text } = await apiFetch('/ai/getTrendingTopics', { method: 'GET' });
     return text;
+};
+
+/**
+ * Starts a video generation job via the backend.
+ */
+export const startVideoGeneration = async (prompt: string, image?: { imageBytes: string, mimeType: string }): Promise<VideoOperation> => {
+    return apiFetch('/ai/generateVideo', {
+        method: 'POST',
+        body: JSON.stringify({ prompt, image }),
+    });
+};
+
+/**
+ * Checks the status of a video generation job via the backend.
+ */
+export const checkVideoGenerationStatus = async (operation: VideoOperation): Promise<VideoOperation> => {
+    return apiFetch('/ai/getVideoOperationStatus', {
+        method: 'POST',
+        body: JSON.stringify({ operation }),
+    });
 };

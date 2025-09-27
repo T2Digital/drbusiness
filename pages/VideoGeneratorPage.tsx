@@ -1,17 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Package, VideoOperation } from '../types';
-import { GoogleGenAI } from '@google/genai';
 import { toBase64 } from '../utils/helpers';
 import { LoadingSpinner, VideoIcon, Wand2Icon, Upload } from '../components/icons';
-
-interface VideoGeneratorPageProps {
-    selectedPackage: Package;
-    onBackToDashboard: () => void;
-}
-
-// FIX: Hardcoded API key to resolve Vercel deployment issues.
-const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+import { startVideoGeneration, checkVideoGenerationStatus } from '../services/geminiService';
+import { API_BASE_URL } from '../services/backendService';
 
 
 const loadingMessages = [
@@ -21,6 +13,12 @@ const loadingMessages = [
     "تصيير المشاهد النهائية، قد يستغرق هذا بعض الوقت...",
     "اللمسات الأخيرة على تحفتك الفنية...",
 ];
+
+// FIX: Defined the 'VideoGeneratorPageProps' interface to resolve the "Cannot find name" error.
+interface VideoGeneratorPageProps {
+    selectedPackage: Package;
+    onBackToDashboard: () => void;
+}
 
 const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage, onBackToDashboard }) => {
     const [prompt, setPrompt] = useState('');
@@ -68,35 +66,28 @@ const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage
             let operation: VideoOperation;
 
             if (imageBase64 && imageFile) {
-                operation = await ai.models.generateVideos({
-                    model: 'veo-2.0-generate-001',
-                    prompt,
-                    image: {
-                        imageBytes: imageBase64,
-                        mimeType: imageFile.type,
-                    },
-                    config: { numberOfVideos: 1 }
+                operation = await startVideoGeneration(prompt, {
+                    imageBytes: imageBase64,
+                    mimeType: imageFile.type,
                 });
             } else {
-                operation = await ai.models.generateVideos({
-                    model: 'veo-2.0-generate-001',
-                    prompt,
-                    config: { numberOfVideos: 1 }
-                });
+                operation = await startVideoGeneration(prompt);
             }
 
             while (!operation.done) {
                 await new Promise(resolve => setTimeout(resolve, 10000));
-                // FIX: Removed 'as any' cast as the type mismatch is resolved by updating the VideoOperation type.
-                operation = await ai.operations.getVideosOperation({ operation: operation });
+                operation = await checkVideoGenerationStatus(operation);
             }
 
             if (operation.response?.generatedVideos?.[0]?.video?.uri) {
                 const downloadLink = operation.response.generatedVideos[0].video.uri;
-                // Fetch the video as a blob and create an object URL to avoid exposing API key in the video src
-                const response = await fetch(`${downloadLink}&key=${GEMINI_API_KEY}`);
+                
+                // Fetch the video through our secure backend proxy
+                const proxiedVideoUrl = `${API_BASE_URL}/ai/getVideo?uri=${encodeURIComponent(downloadLink)}`;
+                
+                const response = await fetch(proxiedVideoUrl);
                 if (!response.ok) {
-                    throw new Error(`Failed to download video: ${response.statusText}`);
+                    throw new Error(`Failed to download video via proxy: ${response.statusText}`);
                 }
                 const videoBlob = await response.blob();
                 const objectUrl = URL.createObjectURL(videoBlob);

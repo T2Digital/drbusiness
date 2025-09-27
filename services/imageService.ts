@@ -1,13 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
+import { apiFetch } from './backendService';
 
 // FIX: Hardcoded API keys to resolve Vercel deployment issues.
-const GEMINI_API_KEY = "AIzaSyD79cpQB0ZNILYRLVkHqod64cihlN-6fs4";
 const UNSPLASH_API_KEY = 'fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA';
 const PIXABAY_API_KEY = '52432821-2c50f7ec268d1b7483c3b3d02';
 const IMGBB_API_KEY = 'bde613bd4475de5e00274a795091ba04';
-
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-const imageModel = 'imagen-4.0-generate-001';
 
 export interface ImageSearchResult {
   id: string;
@@ -19,40 +15,26 @@ export interface ImageSearchResult {
 
 export const imageService = {
   /**
-   * Generates an image using Gemini and returns a base64 data URL.
+   * Generates an image using Gemini via the backend proxy and returns a base64 data URL.
    */
   generateWithGemini: async (prompt: string): Promise<string> => {
-    const response = await ai.models.generateImages({
-        model: imageModel,
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/png',
-        },
+    const { imageBase64 } = await apiFetch('/ai/generateImage', {
+        method: 'POST',
+        body: JSON.stringify({ prompt }),
     });
-
-    const imageBase64 = response.generatedImages[0].image.imageBytes;
-    return `data:image/png;base64,${imageBase64}`;
+    return imageBase64;
   },
 
   /**
-   * Simulates generating an image with another service (e.g., Stable Diffusion via OpenRouter).
-   * For this demo, it just calls Gemini again with a style modifier.
+   * Simulates generating an image with another service by calling the backend proxy.
    */
   generateWithOpenRouter: async (prompt: string): Promise<string> => {
     const modifiedPrompt = `${prompt}, photorealistic, 8k, cinematic lighting`;
-    
-    const response = await ai.models.generateImages({
-        model: imageModel,
-        prompt: modifiedPrompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/png',
-        },
+    const { imageBase64 } = await apiFetch('/ai/generateImage', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: modifiedPrompt }),
     });
-    
-    const imageBase64 = response.generatedImages[0].image.imageBytes;
-    return `data:image/png;base64,${imageBase64}`;
+    return imageBase64;
   },
 
   /**
