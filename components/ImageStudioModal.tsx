@@ -23,6 +23,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
     const [prompt, setPrompt] = useState(post.visualPrompt);
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [finalBrandedImage, setFinalBrandedImage] = useState<string | null>(null);
+    const [addLogo, setAddLogo] = useState(true); // Default to true for automatic logo integration
     const isProcessingSave = useRef(false);
 
     const handleEnhancePrompt = async () => {
@@ -44,13 +45,14 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
         isProcessingSave.current = true;
         try {
             let imageBase64;
+            const logoUrl = addLogo ? client.consultationData.business.logo : undefined;
+
             if (generator === 'gemini') {
-                // FIX: `generateWithGemini` only takes one argument. The branding step is separated.
                 const generatedImage = await imageService.generateWithGemini(prompt);
-                imageBase64 = await imageService.brandImageWithCanvas(generatedImage, client.consultationData.business.logo);
+                imageBase64 = await imageService.brandImageWithCanvas(generatedImage, logoUrl);
             } else {
                 const generatedImage = await imageService.generateWithOpenRouter(prompt);
-                imageBase64 = await imageService.brandImageWithCanvas(generatedImage, client.consultationData.business.logo);
+                imageBase64 = await imageService.brandImageWithCanvas(generatedImage, logoUrl);
             }
              const finalUrl = await imageService.uploadImage(imageBase64);
              onSave(post.id, finalUrl);
@@ -82,7 +84,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
         if(selectedImageUrl) {
             const brandAndDisplay = async () => {
                 try {
-                     const brandedImageB64 = await imageService.brandImageWithCanvas(selectedImageUrl, client.consultationData.business.logo);
+                     const logoUrl = addLogo ? client.consultationData.business.logo : undefined;
+                     const brandedImageB64 = await imageService.brandImageWithCanvas(selectedImageUrl, logoUrl);
                      setFinalBrandedImage(brandedImageB64);
                 } catch (e) {
                      console.error("Failed to brand image with canvas", e);
@@ -92,7 +95,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
             }
             brandAndDisplay();
         }
-    }, [selectedImageUrl, client.consultationData.business.logo]);
+    }, [selectedImageUrl, client.consultationData.business.logo, addLogo]);
 
     const handleSaveSelection = async () => {
         if (finalBrandedImage && !isProcessingSave.current) {
@@ -118,7 +121,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
                         <img src={finalBrandedImage} className="max-w-full h-auto max-h-[50vh] rounded-lg border border-slate-600"/>
                         : <div className="aspect-square w-full max-w-md flex items-center justify-center"><LoadingSpinner className="w-8 h-8"/></div>
                     }
-                    <div className="mt-4 flex gap-4">
+                    <div className="mt-4 flex gap-4 items-center">
                         <button onClick={() => setSelectedImageUrl(null)} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition">العودة للبحث</button>
                         <button onClick={handleSaveSelection} disabled={isLoading} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-500 transition disabled:opacity-50">
                             {isLoading ? 'جاري الحفظ...' : 'حفظ التصميم'}
@@ -154,6 +157,12 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
                                 تحسين
                             </button>
                         </div>
+                        <div className="flex justify-center mt-4">
+                            <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                                <input type="checkbox" checked={addLogo} onChange={(e) => setAddLogo(e.target.checked)} className="h-4 w-4 rounded bg-slate-600 border-slate-500 text-teal-500 focus:ring-teal-500" />
+                                إضافة لوجو البيزنس
+                            </label>
+                        </div>
                         <button onClick={() => handleGenerate(activeTab)} className="bg-gradient-to-r from-teal-500 to-blue-600 text-white font-bold py-3 px-6 rounded-full hover:from-teal-600 hover:to-blue-700 transition flex items-center gap-2 mx-auto mt-4">
                            <Wand2Icon className="w-5 h-5"/> {`إنشاء باستخدام ${activeTab === 'gemini' ? 'Gemini' : 'Stable Diffusion'}`}
                         </button>
@@ -166,9 +175,15 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({ post, client
                          <div className="text-center p-4">
                             <p className="text-sm text-slate-400 mb-2">البحث عن صور بناءً على الوصف:</p>
                              <p className="bg-slate-700/50 p-2 rounded-md text-slate-300 mb-4 font-mono text-xs max-w-md mx-auto truncate">"{prompt}"</p>
-                            <button onClick={() => handleSearch(activeTab)} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition">
-                                {`ابحث في ${activeTab === 'unsplash' ? 'Unsplash' : 'Pixabay'}`}
-                            </button>
+                            <div className="flex justify-center items-center gap-4">
+                                <button onClick={() => handleSearch(activeTab)} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition">
+                                    {`ابحث في ${activeTab === 'unsplash' ? 'Unsplash' : 'Pixabay'}`}
+                                </button>
+                                <label className="flex items-center gap-2 text-slate-300 cursor-pointer text-sm">
+                                <input type="checkbox" checked={addLogo} onChange={(e) => setAddLogo(e.target.checked)} className="h-4 w-4 rounded bg-slate-600 border-slate-500 text-teal-500 focus:ring-teal-500" />
+                                إضافة اللوجو
+                            </label>
+                            </div>
                          </div>
                          {searchResults.length > 0 && (
                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-4">

@@ -1,66 +1,44 @@
+// services/backendService.ts
 import { Client, RegistrationDetails, ConsultationData, Prescription, Package } from '../types';
 
-// --- MOCK DATABASE ---
-// IMPORTANT NOTICE: This is a MOCK backend that uses the browser's `localStorage`.
-// It is intended for demonstration and single-user, single-browser sessions ONLY.
+// ===================================================================================
 //
-// Limitations:
-// - Data is NOT persistent across different browsers or devices.
-// - Data can be easily cleared by the user.
-// - It is NOT secure for multiple users.
+//                              !!! ACTION REQUIRED !!!
 //
-// For a production application, you MUST replace this with a real backend and database
-// (e.g., Firebase, Supabase, a Node.js/Express server with PostgreSQL/MongoDB, etc.).
+// PASTE YOUR FIREBASE CLOUD FUNCTION URL HERE.
+// Find it in your Firebase Console > Functions > Dashboard. It looks like:
+// https://us-central1-your-project-id.cloudfunctions.net/api
+//
+// ===================================================================================
+export const API_BASE_URL = 'https://api-72pksd467q-uc.a.run.app'; // <-- USER'S URL IS NOW LIVE
 
-const DB_KEY = 'dr_business_clients';
 const ADMIN_EMAIL = 'admin@dr.business';
 const ADMIN_PASSWORD = 'password123';
 
-const initialClients: Client[] = [
-    {
-        id: 1,
-        consultationData: {
-            business: { name: 'متجر أزياء عصري', field: 'تجارة ملابس', description: 'متجر إلكتروني متخصص في بيع الملابس العصرية للشباب.', logo: '', website: 'fashion.example.com', location: 'مصر' },
-            goals: { awareness: true, sales: true, leads: false, engagement: true, other: '' },
-            audience: { description: 'شباب وشابات تتراوح أعمارهم بين 18 و 30 عامًا، يهتمون بآخر صيحات الموضة.' }
-        },
-        prescription: {
-            strategy: { title: 'استراتيجية السيطرة على الموضة 2024', summary: 'خطة سنوية للتحول إلى المرجع الأول للموضة الشبابية في مصر.', steps: ['بناء هوية بصرية قوية على انستجرام', 'إطلاق حملات مؤثرين شهرية', 'إنشاء محتوى فيديو جذاب على تيك توك وريلز'] },
-            week1Plan: [ { day: 'الأحد', platform: 'Instagram', postType: 'تفاعلي', caption: 'إيه أكتر لون بتحبوا تلبسوه في الصيف؟ 👕☀️ قولولنا في الكومنتات!', hashtags: '#موضة #صيف #ألوان', visualPrompt: 'A vibrant flat-lay of colorful summer t-shirts against a bright yellow background, with sunglasses and sandals as props. Professional product photography style.' } ],
-            futureWeeksPlan: [],
-        },
-        selectedPackage: { name: 'باقة الحضور اللامع', price: 15000, postsPerMonth: 15, videosPerMonth: 2, features: [], isFeatured: true },
-        connections: { facebook: true, instagram: true, tiktok: false, x: false, linkedin: false },
-        email: 'client1@example.com',
-        status: 'active',
+// Helper function to handle fetch requests and errors, now exported
+export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
     }
-];
-
-const getDb = (): Client[] => {
-    try {
-        const db = localStorage.getItem(DB_KEY);
-        if (db) {
-            return JSON.parse(db);
-        } else {
-            localStorage.setItem(DB_KEY, JSON.stringify(initialClients));
-            return initialClients;
-        }
-    } catch (error) {
-        console.error("Failed to read from localStorage", error);
-        return initialClients;
-    }
+    // Handle cases where response might be empty
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
+  } catch (error) {
+    console.error(`API call to ${endpoint} failed:`, error);
+    throw error;
+  }
 };
 
-const saveDb = (clients: Client[]) => {
-    try {
-        localStorage.setItem(DB_KEY, JSON.stringify(clients));
-    } catch (error) {
-        console.error("Failed to save to localStorage", error);
-    }
-};
-
-// --- MOCK API FUNCTIONS ---
-// All functions are async to simulate real network requests.
 
 export type LoginResult = {
     role: 'admin' | 'client';
@@ -72,39 +50,29 @@ export type LoginResult = {
 
 export const backendService = {
     login: async (email: string, password?: string): Promise<LoginResult> => {
-        await new Promise(res => setTimeout(res, 500)); // Simulate network delay
-        
-        // Admin login
+       // Special hardcoded admin login for now
         if (email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
             return { role: 'admin' };
         }
-
-        // Client login
-        const clients = getDb();
-        const client = clients.find(c => c.email.toLowerCase() === email.toLowerCase());
         
-        if (client) {
-            if (client.status === 'pending') {
-                return { role: 'error', message: 'حسابك لسه بيتراجع. فريقنا هيفعله وهيبعتلك إشعار أول ما يخلص.' };
-            }
-            if (client.status === 'active') {
-                // In a real app, you would check a hashed password.
-                // Since we don't store passwords after registration, we'll just log them in.
-                return { role: 'client', clientId: client.id };
-            }
+        try {
+            const data = await apiFetch('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password }),
+            });
+            // Assuming successful login returns { role: 'client', clientId: ... }
+            return data;
+        } catch (error) {
+            return { role: 'error', message: error instanceof Error ? error.message : 'Login failed' };
         }
-
-        return { role: 'error', message: 'الإيميل أو الباسورد فيهم حاجة غلط. حاول تاني.' };
     },
 
     getClients: async (): Promise<Client[]> => {
-        await new Promise(res => setTimeout(res, 300));
-        return getDb();
+        return apiFetch('/clients');
     },
     
     getClientById: async (id: number): Promise<Client | undefined> => {
-        await new Promise(res => setTimeout(res, 300));
-        return getDb().find(c => c.id === id);
+        return apiFetch(`/clients/${id}`);
     },
 
     registerClient: async (
@@ -113,46 +81,28 @@ export const backendService = {
         prescription: Prescription,
         selectedPackage: Package
     ): Promise<Client> => {
-        await new Promise(res => setTimeout(res, 500));
-        const clients = getDb();
-        const newClient: Client = {
-            id: Date.now(),
-            email: regDetails.email,
-            // DO NOT store the password in the DB in a real app! HASH IT.
-            // We're omitting it here to simulate it being handled securely.
+        const payload = {
+            regDetails,
             consultationData,
             prescription,
             selectedPackage,
-            connections: { facebook: false, instagram: false, tiktok: false, x: false, linkedin: false },
-            status: 'pending',
         };
-        saveDb([...clients, newClient]);
-        return newClient;
+        return apiFetch('/clients', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
     },
 
-    activateClient: async (clientId: number): Promise<boolean> => {
-        await new Promise(res => setTimeout(res, 500));
-        const clients = getDb();
-        const clientIndex = clients.findIndex(c => c.id === clientId);
-        if (clientIndex !== -1) {
-            clients[clientIndex].status = 'active';
-            saveDb(clients);
-            // Set a flag in local storage for the notification system
-            localStorage.setItem(`client_activated__${clients[clientIndex].email}`, 'true');
-            return true;
-        }
-        return false;
+    activateClient: async (clientId: number): Promise<{ success: boolean }> => {
+        return apiFetch(`/clients/${clientId}/activate`, {
+            method: 'POST',
+        });
     },
     
     updateClient: async (updatedClient: Client): Promise<Client> => {
-        await new Promise(res => setTimeout(res, 300));
-        const clients = getDb();
-        const index = clients.findIndex(c => c.id === updatedClient.id);
-        if (index > -1) {
-            clients[index] = updatedClient;
-            saveDb(clients);
-            return updatedClient;
-        }
-        throw new Error("Client not found for update");
+        return apiFetch(`/clients/${updatedClient.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(updatedClient),
+        });
     }
 };

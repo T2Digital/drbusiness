@@ -119,7 +119,8 @@ export interface AdCampaign {
 }
 
 export interface VideoOperation {
-    name: string;
+    // FIX: Made 'name' optional to match the 'GenerateVideosOperation' type from the @google/genai SDK.
+    name?: string;
     done: boolean;
     response?: {
         generatedVideos: {

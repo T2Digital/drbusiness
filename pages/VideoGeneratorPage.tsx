@@ -87,7 +87,8 @@ const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage
 
             while (!operation.done) {
                 await new Promise(resolve => setTimeout(resolve, 10000));
-                operation = await ai.operations.getVideosOperation({ operation: operation as any }); // Cast to any to satisfy type
+                // FIX: Removed 'as any' cast as the type mismatch is resolved by updating the VideoOperation type.
+                operation = await ai.operations.getVideosOperation({ operation: operation });
             }
 
             if (operation.response?.generatedVideos?.[0]?.video?.uri) {

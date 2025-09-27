@@ -587,12 +587,17 @@ const ConnectionsView: React.FC<{connections: SocialConnections, onUpdateConnect
                         </div>
                     )
                 })}
-                 <div className="text-center text-sm text-slate-500 pt-4 bg-slate-900/40 p-4 rounded-lg mt-4">
-                    <h4 className="font-bold text-slate-300">كيف يعمل الاتصال؟</h4>
-                    <p>عند الضغط على "اتصال"، سيتم توجيهك إلى صفحة الصلاحيات الرسمية للمنصة لمنح دكتور بزنس الإذن بالإدارة.
-                    <br/>
-                    <b>ملاحظة فنية:</b> هذه واجهة توضيحية. الربط الفعلي يتطلب بناء تكامل مع الواجهات البرمجية (APIs) لكل منصة ووجود نظام خلفي (Backend) آمن لتخزين صلاحيات الوصول.
+                 <div className="text-sm text-slate-500 pt-4 bg-slate-900/40 p-4 rounded-lg mt-6 border border-slate-700">
+                    <h4 className="font-bold text-slate-300 text-base mb-2">ملاحظة فنية هامة (للانتقال للإنتاج)</h4>
+                    <p>
+                        هذه الواجهة هي محاكاة لعملية الربط. لتفعيل النشر التلقائي وإدارة الإعلانات بشكل حقيقي، يجب تنفيذ الخطوات التالية في نظام خلفي (Backend) آمن:
                     </p>
+                    <ul className="list-disc list-inside mt-2 space-y-1 text-slate-400">
+                        <li>تسجيل "دكتور بزنس" كتطبيق للمطورين على كل منصة (مثل Meta for Developers).</li>
+                        <li>استبدال `YOUR_CLIENT_ID` بمعرف العميل الحقيقي من كل منصة.</li>
+                        <li>بناء نظام خلفي للتعامل مع بروتوكول الربط الآمن (OAuth 2.0) لتخزين مفاتيح الوصول (Access Tokens) بشكل مشفر.</li>
+                        <li>استخدام الواجهات البرمجية الرسمية (APIs) للمنصات لتنفيذ عمليات النشر والجدولة وقراءة التحليلات.</li>
+                    </ul>
                 </div>
             </div>
         </div>
