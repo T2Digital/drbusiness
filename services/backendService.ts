@@ -10,7 +10,7 @@ import { Client, RegistrationDetails, ConsultationData, Prescription, Package } 
 // https://us-central1-your-project-id.cloudfunctions.net/api
 //
 // ===================================================================================
-export const API_BASE_URL = 'https://api-72pksd467q-uc.a.run.app'; // <-- USER'S URL IS NOW LIVE
+export const API_BASE_URL = '/api'; // <-- USER'S URL IS NOW LIVE
 
 const ADMIN_EMAIL = 'admin@dr.business';
 const ADMIN_PASSWORD = 'password123';
@@ -26,15 +26,26 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
         ...options.headers,
       },
     });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-      throw new Error(errorData.message || `Request failed with status ${response.status}`);
-    }
-    // Handle cases where response might be empty
+
     const text = await response.text();
+
+    if (!response.ok) {
+      // Try to parse the error text as JSON, otherwise use the raw text.
+      let message;
+      try {
+        message = JSON.parse(text).message;
+      } catch {
+        message = text; // Fallback to raw text if not JSON
+      }
+      throw new Error(message || `Request failed with status ${response.status}`);
+    }
+
     return text ? JSON.parse(text) : {};
   } catch (error) {
     console.error(`API call to ${endpoint} failed:`, error);
+    if (error instanceof SyntaxError) {
+        throw new Error("Received an invalid response from the server. The service might be temporarily unavailable.");
+    }
     throw error;
   }
 };

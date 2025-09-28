@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Prescription, ConsultationData, DetailedPost } from '../types';
 import { LoadingSpinner, DownloadIcon, CopyIcon } from '../components/icons';
 import { forceDownload } from '../utils/helpers';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { imageService } from '../services/imageService';
 
 interface PrescriptionPageProps {
   prescription: Prescription | null;
@@ -11,11 +12,32 @@ interface PrescriptionPageProps {
   error: string | null;
 }
 
-const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onProceed, error }) => {
+const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consultationData, onProceed, error }) => {
     const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('week1');
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [isDownloading, setIsDownloading] = useState<number | null>(null);
+    const [brandedImages, setBrandedImages] = useState<Record<number, string>>({});
+
+    useEffect(() => {
+        if (prescription && consultationData?.business.logo) {
+            const logoUrl = consultationData.business.logo;
+            prescription.week1Plan.forEach((post, index) => {
+                if (post.generatedImage) {
+                    imageService.brandImageWithCanvas(post.generatedImage, logoUrl)
+                        .then(brandedUrl => {
+                            setBrandedImages(prev => ({ ...prev, [index]: brandedUrl }));
+                        })
+                        .catch(err => {
+                            console.error(`Failed to brand image for post ${index}:`, err);
+                            // Fallback to original image if branding fails
+                            setBrandedImages(prev => ({ ...prev, [index]: post.generatedImage! }));
+                        });
+                }
+            });
+        }
+    }, [prescription, consultationData?.business.logo]);
+
 
     const handleCopy = (post: DetailedPost, index: number) => {
         const textToCopy = `${post.caption}\n\n${post.hashtags}`;
@@ -92,45 +114,51 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, onPro
                     <div>
                         {activeTab === 'week1' && (
                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {prescription.week1Plan.map((post, index) => (
-                                    <div key={index} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
-                                        <div className="aspect-square bg-slate-700 flex items-center justify-center">
-                                            {post.generatedImage ? 
-                                                <img 
-                                                    src={post.generatedImage} 
-                                                    alt={post.visualPrompt} 
-                                                    className="w-full h-full object-cover cursor-pointer"
-                                                    onClick={() => setPreviewImageUrl(post.generatedImage)}
-                                                />
-                                                : 
-                                                <div className="text-center p-4 text-yellow-400">
-                                                    <p>لم نتمكن من توليد صورة. يمكنك إنشائها من لوحة التحكم لاحقًا.</p>
+                                {prescription.week1Plan.map((post, index) => {
+                                    const displayImage = brandedImages[index] || post.generatedImage;
+                                    return (
+                                        <div key={index} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
+                                            <div className="aspect-square bg-slate-700 flex items-center justify-center">
+                                                {post.generatedImage ? 
+                                                    (displayImage ?
+                                                        <img 
+                                                            src={displayImage} 
+                                                            alt={post.visualPrompt} 
+                                                            className="w-full h-full object-cover cursor-pointer"
+                                                            onClick={() => setPreviewImageUrl(displayImage)}
+                                                        />
+                                                        : <LoadingSpinner className="w-8 h-8 text-slate-500" />
+                                                    )
+                                                    : 
+                                                    <div className="text-center p-4 text-yellow-400">
+                                                        <p>لم نتمكن من توليد صورة. يمكنك إنشائها من لوحة التحكم لاحقًا.</p>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div className="p-4 flex flex-col flex-grow">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-sm font-bold text-slate-300">{post.day}</span>
+                                                    <span className="inline-block bg-blue-500/20 text-blue-300 text-xs font-semibold px-2 py-1 rounded-full">{post.platform}</span>
                                                 </div>
-                                            }
-                                        </div>
-                                        <div className="p-4 flex flex-col flex-grow">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="text-sm font-bold text-slate-300">{post.day}</span>
-                                                <span className="inline-block bg-blue-500/20 text-blue-300 text-xs font-semibold px-2 py-1 rounded-full">{post.platform}</span>
-                                            </div>
-                                            <p className="text-slate-400 text-sm mb-3 h-24 overflow-y-auto p-2 bg-slate-900/50 rounded-md whitespace-pre-wrap">{post.caption}</p>
-                                            <p className="text-slate-500 text-xs mb-4 h-12 overflow-y-auto">{post.hashtags}</p>
-                                            <div className="mt-auto grid grid-cols-2 gap-2">
-                                                <button onClick={() => handleCopy(post, index)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white font-bold py-2 px-3 rounded-md hover:bg-slate-600 transition">
-                                                    <CopyIcon className="w-4 h-4" /> {copiedPostId === `week1-${index}` ? 'اتنسخ!' : 'انسخ المحتوى'}
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDownload(post.generatedImage, index)}
-                                                    disabled={!post.generatedImage || isDownloading === index}
-                                                    className={`flex items-center justify-center gap-2 w-full text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition disabled:opacity-50`}
-                                                >
-                                                    {isDownloading === index ? <LoadingSpinner className="w-4 h-4" /> : <DownloadIcon className="w-4 h-4" />}
-                                                    {isDownloading === index ? 'جاري التحميل...' : 'تحميل الصورة'}
-                                                </button>
+                                                <p className="text-slate-400 text-sm mb-3 h-24 overflow-y-auto p-2 bg-slate-900/50 rounded-md whitespace-pre-wrap">{post.caption}</p>
+                                                <p className="text-slate-500 text-xs mb-4 h-12 overflow-y-auto">{post.hashtags}</p>
+                                                <div className="mt-auto grid grid-cols-2 gap-2">
+                                                    <button onClick={() => handleCopy(post, index)} className="flex items-center justify-center gap-2 w-full text-sm bg-slate-700 text-white font-bold py-2 px-3 rounded-md hover:bg-slate-600 transition">
+                                                        <CopyIcon className="w-4 h-4" /> {copiedPostId === `week1-${index}` ? 'اتنسخ!' : 'انسخ المحتوى'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDownload(displayImage, index)}
+                                                        disabled={!displayImage || isDownloading === index}
+                                                        className={`flex items-center justify-center gap-2 w-full text-sm bg-teal-600 text-white font-bold py-2 px-3 rounded-md hover:bg-teal-500 transition disabled:opacity-50`}
+                                                    >
+                                                        {isDownloading === index ? <LoadingSpinner className="w-4 h-4" /> : <DownloadIcon className="w-4 h-4" />}
+                                                        {isDownloading === index ? 'جاري التحميل...' : 'تحميل الصورة'}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                         {prescription.futureWeeksPlan.map(week => (
