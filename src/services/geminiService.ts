@@ -2,8 +2,19 @@ import { AnalyticsData, ConsultationData, DetailedPost, Prescription, SimplePost
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { imageService } from './imageService';
 
-// Initialize the Gemini AI model
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// LAZY INITIALIZATION FOR AI CLIENT
+let ai: GoogleGenAI | null = null;
+const getAiClient = () => {
+    if (!ai) {
+        if (!process.env.API_KEY) {
+            // This error is critical for developers to see during deployment or testing.
+            throw new Error("API_KEY environment variable not set. The application cannot contact the AI service.");
+        }
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+};
+
 const textModel = 'gemini-2.5-flash';
 const imageEditModel = 'gemini-2.5-flash-image-preview';
 const videoModel = 'veo-2.0-generate-001';
@@ -38,6 +49,7 @@ The 'adType' field should describe the ad format (e.g., 'Image Ad', 'Carousel Ad
  * Generates a marketing prescription using the Gemini API.
  */
 export const generatePrescription = async (data: ConsultationData): Promise<Prescription> => {
+    const aiClient = getAiClient();
     const prescriptionSchema = {
       type: Type.OBJECT,
       properties: {
@@ -50,7 +62,7 @@ export const generatePrescription = async (data: ConsultationData): Promise<Pres
     const goals = Object.entries(data.goals).filter(([, v]) => v).map(([k]) => k).join(", ");
     const prompt = `Based on this business profile: Name: ${data.business.name}, Field: ${data.business.field}, Description: ${data.business.description}, Location: ${data.business.location}, Website: ${data.business.website}, Goals: ${goals}, Audience: ${data.audience.description}. Generate a comprehensive marketing prescription in ARABIC, framing all content as sponsored ads. The output MUST be a JSON object that strictly follows the schema. It must contain: 1. 'strategy' (title, summary, 4-6 steps). 2. 'week1Plan' (7 DetailedPost objects where each 'caption' is a masterpiece of ad copy following the persona rules: killer hook, persuasive body, and unmissable CTA. The 'visualPrompt' MUST be a detailed ad creative description in ENGLISH ONLY that is a literal visual representation of the caption's core idea, with NO TEXT in it. The 'adType' must be specified). 3. 'futureWeeksPlan' (3 FutureWeek objects for weeks 2, 3, 4 with ad ideas).`;
     
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: prompt,
         config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: prescriptionSchema },
@@ -90,9 +102,10 @@ export const generateDetailedWeekPlan = async (
     consultationData: ConsultationData,
     posts: SimplePost[]
 ): Promise<DetailedPost[]> => {
+    const aiClient = getAiClient();
     const prompt = `Business Profile: ${consultationData.business.name} - ${consultationData.business.description}. Based on these simple ad ideas: ${JSON.stringify(posts)}. For each idea, generate a detailed ad: a powerful ARABIC ad copy (following the persona rules: killer hook, persuasive body, unmissable CTA), ARABIC hashtags, an 'adType', and a detailed ENGLISH ONLY visual prompt for the ad creative that is a literal visual representation of the copy's core message, with NO TEXT in it.`;
     
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: prompt,
         config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, platform: { type: Type.STRING }, adType: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.STRING }, visualPrompt: { type: Type.STRING } }, required: ["day", "platform", "adType", "caption", "hashtags", "visualPrompt"] } } },
@@ -125,7 +138,8 @@ export const generateDetailedWeekPlan = async (
  * Generates caption variations using the Gemini API.
  */
 export const generateCaptionVariations = async (originalCaption: string, businessContext: string): Promise<string[]> => {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: `Business context: ${businessContext}. Original ad copy: "${originalCaption}". Generate 3 distinct, powerful alternative ad copies in ARABIC. Each must follow the persona rules (killer hook, persuasive body, CTA) and vary in tone (e.g., one witty, one aggressive, one insightful).`,
         config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { variations: { type: Type.ARRAY, items: { type: Type.STRING } } } } },
@@ -141,7 +155,8 @@ export const generateCaptionVariations = async (originalCaption: string, busines
  * Elaborates on a strategy step using the Gemini API.
  */
 export const elaborateOnStrategyStep = async (businessContext: string, step: string): Promise<string> => {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: `Business context: ${businessContext}. Elaborate on this strategic step: "${step}". Provide a detailed, actionable explanation in ARABIC, using markdown for formatting (like **bold** and lists).`,
         config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT },
@@ -153,7 +168,8 @@ export const elaborateOnStrategyStep = async (businessContext: string, step: str
  * Generates mock analytics data using the Gemini API.
  */
 export const generateAnalyticsData = async (businessContext: string): Promise<AnalyticsData> => {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: `For a business like this: ${businessContext}, generate realistic but MOCK social media analytics data for a dashboard. Provide follower growth (value, trend), engagement rate (value, trend), reach (value, trend), and weekly performance (an array of 7 numbers from 0-100 for Sun-Sat).`,
         config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { followerGrowth: { type: Type.OBJECT, properties: { value: { type: Type.INTEGER }, trend: { type: Type.NUMBER } } }, engagementRate: { type: Type.OBJECT, properties: { value: { type: Type.NUMBER }, trend: { type: Type.NUMBER } } }, reach: { type: Type.OBJECT, properties: { value: { type: Type.INTEGER }, trend: { type: Type.NUMBER } } }, weeklyPerformance: { type: Type.ARRAY, items: { type: Type.INTEGER } } } } },
@@ -168,8 +184,9 @@ export const generateAnalyticsData = async (businessContext: string): Promise<An
  * Edits an image using the Gemini API.
  */
 export const editImageWithPrompt = async (base64ImageData: string, mimeType: string, prompt: string): Promise<string> => {
+    const aiClient = getAiClient();
     const b64Data = base64ImageData.split(',')[1] || base64ImageData;
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
         model: imageEditModel,
         contents: { parts: [{ inlineData: { data: b64Data, mimeType } }, { text: prompt }] },
         config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
@@ -189,7 +206,8 @@ export const editImageWithPrompt = async (base64ImageData: string, mimeType: str
  * Enhances a visual prompt using the Gemini API.
  */
 export const enhanceVisualPrompt = async (prompt: string): Promise<string> => {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: `Enhance this visual prompt for an AI image generator to be more artistic, detailed, and professional. Keep the core concept but add cinematic and stylistic elements. Your response must ONLY be the enhanced prompt in ENGLISH. Original prompt: "${prompt}"`,
     });
@@ -200,7 +218,8 @@ export const enhanceVisualPrompt = async (prompt: string): Promise<string> => {
  * Gets trending topics using the Gemini API with Google Search grounding.
  */
 export const getTrendingTopics = async (): Promise<string> => {
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateContent({
         model: textModel,
         contents: "Analyze the current social media landscape in Egypt. I need a report in classy colloquial Egyptian Arabic. The output must be formatted in markdown with three specific sections: '### ترندات السوشيال', '### هاشتاجات مولعة', and '### أخبار عاملة قلق'. For each section, list the top 3-4 trending items with a brief, witty explanation for why it's trending.",
         config: { tools: [{ googleSearch: {} }] },
@@ -217,7 +236,8 @@ export const getTrendingTopics = async (): Promise<string> => {
  * Starts a video generation job using the Gemini API.
  */
 export const startVideoGeneration = async (prompt: string, image?: { imageBytes: string, mimeType: string }): Promise<VideoOperation> => {
-    return await ai.models.generateVideos({
+    const aiClient = getAiClient();
+    return await aiClient.models.generateVideos({
         model: videoModel,
         prompt,
         image: image || undefined,
@@ -229,5 +249,6 @@ export const startVideoGeneration = async (prompt: string, image?: { imageBytes:
  * Checks the status of a video generation job using the Gemini API.
  */
 export const checkVideoGenerationStatus = async (operation: VideoOperation): Promise<VideoOperation> => {
-    return await ai.operations.getVideosOperation({ operation }) as VideoOperation;
+    const aiClient = getAiClient();
+    return await aiClient.operations.getVideosOperation({ operation }) as VideoOperation;
 };

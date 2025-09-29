@@ -5,9 +5,19 @@ const UNSPLASH_API_KEY = 'fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA';
 const PIXABAY_API_KEY = '52432821-2c50f7ec268d1b7483c3b3d02';
 const IMGBB_API_KEY = 'bde613bd4475de5e00274a795091ba04';
 
-// Initialize Gemini for image generation
-// FIX: Use process.env.API_KEY as required by coding guidelines and to fix vite/typescript error.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// LAZY INITIALIZATION FOR AI CLIENT
+let ai: GoogleGenAI | null = null;
+const getAiClient = () => {
+    if (!ai) {
+        if (!process.env.API_KEY) {
+            // This error is critical for developers to see during deployment or testing.
+            throw new Error("API_KEY environment variable not set. The application cannot contact the AI service.");
+        }
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+};
+
 const imageModel = "imagen-4.0-generate-001";
 
 export interface ImageSearchResult {
@@ -23,7 +33,8 @@ export const imageService = {
    * Generates an image using Gemini and returns a base64 data URL.
    */
   generateWithGemini: async (prompt: string): Promise<string> => {
-    const response = await ai.models.generateImages({
+    const aiClient = getAiClient();
+    const response = await aiClient.models.generateImages({
         model: imageModel,
         prompt: prompt,
         config: { numberOfImages: 1, outputMimeType: 'image/png' },
@@ -38,8 +49,9 @@ export const imageService = {
    * Simulates generating an image with another service by using Gemini with a modified prompt.
    */
   generateWithOpenRouter: async (prompt: string): Promise<string> => {
+    const aiClient = getAiClient();
     const modifiedPrompt = `${prompt}, photorealistic, 8k, cinematic lighting`;
-    const response = await ai.models.generateImages({
+    const response = await aiClient.models.generateImages({
         model: imageModel,
         prompt: modifiedPrompt,
         config: { numberOfImages: 1, outputMimeType: 'image/png' },
