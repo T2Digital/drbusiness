@@ -211,7 +211,7 @@ export const enhanceVisualPrompt = async (prompt: string): Promise<string> => {
         model: textModel,
         contents: `Enhance this visual prompt for an AI image generator to be more artistic, detailed, and professional. Keep the core concept but add cinematic and stylistic elements. Your response must ONLY be the enhanced prompt in ENGLISH. Original prompt: "${prompt}"`,
     });
-    return response.text.trim();
+    return (response.text || '').trim();
 };
 
 /**
