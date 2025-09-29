@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrainCircuitIcon, ChartBarIcon, CalendarIcon, UserIcon, CogIcon, LogoutIcon, VideoIcon, LinkIcon } from './icons';
+import { BrainCircuitIcon, ChartBarIcon, CalendarIcon, UserIcon, LogoutIcon, VideoIcon, LinkIcon } from './icons';
 
 type View = 'content' | 'strategy' | 'analytics' | 'connections';
 type UserRole = 'admin' | 'client';

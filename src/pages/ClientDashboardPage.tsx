@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 // FIX: Added PostWithStatus to the import from types.ts to use the centralized definition.
-import { Prescription, Client, DetailedPost, FutureWeek, Package, SimplePost, SocialConnections, AnalyticsData, PostWithStatus } from '../types';
+import { Prescription, Client, DetailedPost, FutureWeek, SocialConnections, AnalyticsData, PostWithStatus } from '../types';
 import { editImageWithPrompt, generateCaptionVariations, generateDetailedWeekPlan, elaborateOnStrategyStep, generateAnalyticsData } from '../services/geminiService';
-import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, ChartBarIcon, LinkIcon, VideoIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
+import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, LinkIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ImageStudioModal } from '../components/ImageStudioModal';
 import { forceDownload, exportElementAsPDF, exportContentPlanAsPDF, urlToBase64 } from '../utils/helpers';
@@ -392,7 +392,7 @@ const ContentCalendarView: React.FC<{
                                     src={post.generatedImage} 
                                     alt={post.visualPrompt} 
                                     className="w-full h-full object-cover cursor-pointer"
-                                    onClick={() => setPreviewImageUrl(post.generatedImage)}
+                                    onClick={() => setPreviewImageUrl(post.generatedImage || null)}
                                 />
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => onOpenDesignStudio(post)} title="إعادة تصميم الصورة" className="bg-slate-900/80 text-white p-3 rounded-full hover:bg-slate-900"><BrainCircuitIcon className="w-5 h-5"/></button>

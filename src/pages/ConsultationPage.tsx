@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BusinessData, MarketingGoals, TargetAudience, ConsultationData } from '../types';
+import { MarketingGoals, ConsultationData } from '../types';
 import { toBase64 } from '../utils/helpers';
-import { Upload, UserCircle } from '../components/icons';
+import { UserCircle } from '../components/icons';
 import { AboutModal } from '../components/AboutModal';
 
 
@@ -107,7 +107,6 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit, onBackToH
   };
   
   const handleGoalsDone = () => {
-    const selectedGoals = Object.entries(data.goals).filter(([, val]) => val === true).map(([key]) => key).join(', ');
     addMessage({sender: 'user', text: `تمام، دي أهدافي.`});
     handleNextQuestion();
   };
