@@ -1,4 +1,4 @@
-import { AnalyticsData, ConsultationData, DetailedPost, Prescription, SimplePost, VideoOperation } from '../types';
+import { AnalyticsData, ConsultationData, DetailedPost, Prescription, SimplePost } from '../types';
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { imageService } from './imageService';
 
@@ -161,7 +161,7 @@ export const elaborateOnStrategyStep = async (businessContext: string, step: str
         contents: `Business context: ${businessContext}. Elaborate on this strategic step: "${step}". Provide a detailed, actionable explanation in ARABIC, using markdown for formatting (like **bold** and lists).`,
         config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT },
     });
-    return response.text;
+    return response.text || '';
 };
 
 /**
@@ -235,20 +235,20 @@ export const getTrendingTopics = async (): Promise<string> => {
 /**
  * Starts a video generation job using the Gemini API.
  */
-export const startVideoGeneration = async (prompt: string, image?: { imageBytes: string, mimeType: string }): Promise<VideoOperation> => {
+export const startVideoGeneration = async (prompt: string, image?: { imageBytes: string, mimeType: string }): Promise<any> => {
     const aiClient = getAiClient();
     return await aiClient.models.generateVideos({
         model: videoModel,
         prompt,
         image: image || undefined,
         config: { numberOfVideos: 1 },
-    }) as VideoOperation;
+    });
 };
 
 /**
  * Checks the status of a video generation job using the Gemini API.
  */
-export const checkVideoGenerationStatus = async (operation: VideoOperation): Promise<VideoOperation> => {
+export const checkVideoGenerationStatus = async (operation: any): Promise<any> => {
     const aiClient = getAiClient();
-    return await aiClient.operations.getVideosOperation({ operation }) as VideoOperation;
+    return await aiClient.operations.getVideosOperation({ operation });
 };

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Package, VideoOperation } from '../types';
+import { Package } from '../types';
 import { toBase64 } from '../utils/helpers';
 import { LoadingSpinner, VideoIcon, Wand2Icon, Upload } from '../components/icons';
 import { startVideoGeneration, checkVideoGenerationStatus } from '../services/geminiService';
@@ -62,7 +62,7 @@ const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage
         }, 5000);
 
         try {
-            let operation: VideoOperation;
+            let operation: any;
 
             if (imageBase64 && imageFile) {
                 operation = await startVideoGeneration(prompt, {
