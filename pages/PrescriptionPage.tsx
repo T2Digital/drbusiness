@@ -22,7 +22,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
     useEffect(() => {
         if (prescription && consultationData?.business.logo) {
             const logoUrl = consultationData.business.logo;
-            prescription.week1Plan.forEach((post, index) => {
+            (prescription.week1Plan || []).forEach((post, index) => {
                 if (post.generatedImage) {
                     imageService.brandImageWithCanvas(post.generatedImage, logoUrl)
                         .then(brandedUrl => {
@@ -88,10 +88,10 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                 </header>
 
                 <section className="mb-12 bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-lg">
-                    <h2 className="text-3xl font-bold text-teal-300 mb-4">{prescription.strategy.title}</h2>
-                    <p className="text-slate-300 mb-6">{prescription.strategy.summary}</p>
+                    <h2 className="text-3xl font-bold text-teal-300 mb-4">{prescription.strategy?.title}</h2>
+                    <p className="text-slate-300 mb-6">{prescription.strategy?.summary}</p>
                     <div className="space-y-4">
-                        {prescription.strategy.steps.map((step, i) => (
+                        {(prescription.strategy?.steps || []).map((step, i) => (
                             <div key={i} className="flex items-start">
                                 <div className="flex-shrink-0 w-8 h-8 bg-teal-500/20 text-teal-300 rounded-full flex items-center justify-center font-bold mr-4">{i + 1}</div>
                                 <p className="text-slate-300">{step}</p>
@@ -105,7 +105,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                     <div className="border-b border-slate-700 mb-6">
                         <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
                             <button onClick={() => setActiveTab('week1')} className={`${activeTab === 'week1' ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع الأول (جاهز بالنشر)</button>
-                            {prescription.futureWeeksPlan.map(week => (
+                            {(prescription.futureWeeksPlan || []).map(week => (
                                 <button key={week.week} onClick={() => setActiveTab(`week${week.week}`)} className={`${activeTab === `week${week.week}` ? 'border-teal-400 text-teal-300' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg`}>الأسبوع {week.week}</button>
                             ))}
                         </nav>
@@ -114,7 +114,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                     <div>
                         {activeTab === 'week1' && (
                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {prescription.week1Plan.map((post, index) => {
+                                {(prescription.week1Plan || []).map((post, index) => {
                                     const displayImage = brandedImages[index] || post.generatedImage;
                                     return (
                                         <div key={index} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
@@ -161,13 +161,13 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                                 })}
                             </div>
                         )}
-                        {prescription.futureWeeksPlan.map(week => (
+                        {(prescription.futureWeeksPlan || []).map(week => (
                            activeTab === `week${week.week}` && (
                                <div key={week.week} className="bg-slate-800 p-6 rounded-xl border border-slate-700">
                                    <h3 className="text-2xl font-bold text-teal-300 mb-2">أفكار الأسبوع {week.week}</h3>
                                    <p className="text-slate-400 mb-6">{week.summary}</p>
                                    <div className="space-y-3">
-                                        {week.posts.map((post, i) => (
+                                        {(week.posts || []).map((post, i) => (
                                             <div key={i} className="p-3 bg-slate-700/50 rounded-md flex justify-between items-center">
                                                 <div>
                                                     <p className="font-bold text-slate-200">{post.day}: <span className="font-normal text-slate-300">{post.idea}</span></p>

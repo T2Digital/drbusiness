@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { BusinessData, MarketingGoals, TargetAudience, ConsultationData } from '../types';
 import { toBase64 } from '../utils/helpers';
@@ -129,8 +130,8 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit, onBackToH
   
   return (
     <>
-    <div className="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 bg-slate-900 animate-fade-in relative">
-      <header className="absolute top-0 right-0 w-full p-4 z-20">
+    <div className="h-screen flex flex-col items-center p-2 sm:p-4 bg-slate-900 animate-fade-in relative">
+      <header className="w-full p-4 z-20 shrink-0">
         <div className="max-w-2xl mx-auto flex justify-between items-center">
              <div className="flex items-center gap-4">
                 <button onClick={onBackToHome} className="text-slate-400 hover:text-white transition text-sm font-semibold">الرئيسية</button>
@@ -141,7 +142,7 @@ const ConsultationPage: React.FC<ConsultationPageProps> = ({ onSubmit, onBackToH
             </button>
         </div>
       </header>
-      <div className="w-full max-w-2xl min-h-[70vh] max-h-[85vh] flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 mt-16">
+      <div className="w-full max-w-2xl flex-1 flex flex-col bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 mb-4 overflow-hidden">
         <div className="p-4 border-b border-slate-700 flex items-center gap-3">
           <img src="https://i.ibb.co/C3jQ6GWD/a33b552d00ae.png" alt="Logo" className="w-8 h-8"/>
           <div>

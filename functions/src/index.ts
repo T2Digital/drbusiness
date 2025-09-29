@@ -2,8 +2,8 @@
 import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
-// FIX: Using `require` for the Express import to ensure correct type resolution within the Firebase Functions environment, which was causing cascading type errors.
-import express = require("express");
+// FIX: Changed import from `require` to standard ES module `import` syntax to resolve "Import assignment cannot be used" error.
+import express from "express";
 import cors from "cors";
 import {GoogleGenAI, Type, Modality} from "@google/genai";
 import {
@@ -77,7 +77,7 @@ app.post("/ai/generateDetailedWeekPlan", async (req: express.Request, res: expre
         const response = await aiInstance.models.generateContent({
             model: textModel,
             contents: `Business Profile: ${consultationData.business.name} - ${consultationData.business.description}. Based on these simple ideas: ${JSON.stringify(posts)}. For each idea, generate a detailed post: powerful ARABIC caption, ARABIC hashtags, and a detailed ENGLISH visual prompt.`,
-            config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, platform: { type: Type.STRING }, postType: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.STRING }, visualPrompt: { type: Type.STRING } }, required: ["day", "platform", "postType", "caption", "hashtags", "visualPrompt"] } } },
+            config: { systemInstruction: DR_BUSINESS_PERSONA_PROMPT, responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, platform: { type: Type.STRING }, adType: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.STRING }, visualPrompt: { type: Type.STRING } }, required: ["day", "platform", "adType", "caption", "hashtags", "visualPrompt"] } } },
         });
         if (!response.text) {
             return res.status(500).json({ error: "No text returned from AI for detailedPosts" });

@@ -1,9 +1,13 @@
-import { apiFetch } from './backendService';
+import { GoogleGenAI } from '@google/genai';
 
 // FIX: Hardcoded API keys to resolve Vercel deployment issues.
 const UNSPLASH_API_KEY = 'fPmjcDtV7iErmSDtU-GQ8zShHmfqD5n-E98qNAyJWpA';
 const PIXABAY_API_KEY = '52432821-2c50f7ec268d1b7483c3b3d02';
 const IMGBB_API_KEY = 'bde613bd4475de5e00274a795091ba04';
+
+// Initialize Gemini for image generation
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const imageModel = "imagen-4.0-generate-001";
 
 export interface ImageSearchResult {
   id: string;
@@ -15,26 +19,34 @@ export interface ImageSearchResult {
 
 export const imageService = {
   /**
-   * Generates an image using Gemini via the backend proxy and returns a base64 data URL.
+   * Generates an image using Gemini and returns a base64 data URL.
    */
   generateWithGemini: async (prompt: string): Promise<string> => {
-    const { imageBase64 } = await apiFetch('/ai/generateImage', {
-        method: 'POST',
-        body: JSON.stringify({ prompt }),
+    const response = await ai.models.generateImages({
+        model: imageModel,
+        prompt: prompt,
+        config: { numberOfImages: 1, outputMimeType: 'image/png' },
     });
-    return imageBase64;
+    if (response.generatedImages && response.generatedImages[0]?.image?.imageBytes) {
+        return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
+    }
+    throw new Error("AI did not return an image.");
   },
 
   /**
-   * Simulates generating an image with another service by calling the backend proxy.
+   * Simulates generating an image with another service by using Gemini with a modified prompt.
    */
   generateWithOpenRouter: async (prompt: string): Promise<string> => {
     const modifiedPrompt = `${prompt}, photorealistic, 8k, cinematic lighting`;
-    const { imageBase64 } = await apiFetch('/ai/generateImage', {
-        method: 'POST',
-        body: JSON.stringify({ prompt: modifiedPrompt }),
+    const response = await ai.models.generateImages({
+        model: imageModel,
+        prompt: modifiedPrompt,
+        config: { numberOfImages: 1, outputMimeType: 'image/png' },
     });
-    return imageBase64;
+     if (response.generatedImages && response.generatedImages[0]?.image?.imageBytes) {
+        return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
+    }
+    throw new Error("AI did not return an image.");
   },
 
   /**

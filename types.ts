@@ -28,7 +28,7 @@ export interface ConsultationData {
 export interface DetailedPost {
   day: string;
   platform: string;
-  postType: string;
+  adType: string;
   caption: string;
   hashtags: string;
   visualPrompt: string;

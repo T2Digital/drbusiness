@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AboutModal } from '../components/AboutModal';
 import { TrendingTopics } from '../components/TrendingTopics';
@@ -19,7 +20,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onLogin, onAdmin }) 
       <div className="absolute top-0 left-0 -translate-x-1/3 -translate-y-1/3 w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-teal-500/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-blue-500/10 rounded-full blur-3xl"></div>
 
-      <nav className="absolute top-0 right-0 p-4 sm:p-6">
+      <nav className="absolute top-0 left-0 p-4 sm:p-6">
         <button onClick={onLogin} className="bg-slate-800/50 text-white font-bold py-2 px-5 sm:px-6 rounded-full hover:bg-slate-700/70 transition backdrop-blur-sm text-sm sm:text-base">
           تسجيل الدخول
         </button>

@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Prescription, Client, DetailedPost, FutureWeek, Package, SimplePost, SocialConnections, AnalyticsData } from '../types';
 import { editImageWithPrompt, generateCaptionVariations, generateDetailedWeekPlan, elaborateOnStrategyStep, generateAnalyticsData } from '../services/geminiService';
 import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, ChartBarIcon, LinkIcon, VideoIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ImageStudioModal } from '../components/ImageStudioModal';
-import { forceDownload } from '../utils/helpers';
+import { forceDownload, exportElementAsPDF, exportContentPlanAsPDF, urlToBase64 } from '../utils/helpers';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { imageService } from '../services/imageService';
 
 interface ClientDashboardPageProps {
   client: Client;
@@ -129,7 +131,7 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
                     ...(client.prescription.detailedPlans || {}),
                     [weekKey]: detailedPosts,
                 },
-                futureWeeksPlan: client.prescription.futureWeeksPlan.filter(fw => fw.week !== week.week),
+                futureWeeksPlan: (client.prescription.futureWeeksPlan || []).filter(fw => fw.week !== week.week),
             };
 
             onUpdateClient({ ...client, prescription: updatedPrescription });
@@ -151,11 +153,21 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
         if (!aiEditingState || !aiEditingState.post.generatedImage) return;
         setAiEditingState(prev => prev ? {...prev, isEditing: true} : null);
         try {
-            // This is complex as it requires fetching the image, converting to base64, then sending.
-            // For this demo, we'll assume it's a base64 string if it's not a URL.
-            // This part will need a proper backend to handle image fetching for editing.
-            alert("AI Image Editing on saved images requires a backend to process the image URL. This feature is for demonstration on newly generated images.");
-        } catch (error) { console.error("AI editing failed", error); } finally { setAiEditingState(null); }
+            const originalImageUrl = aiEditingState.post.generatedImage;
+            const base64Image = await urlToBase64(originalImageUrl);
+            const mimeType = base64Image.substring(base64Image.indexOf(":") + 1, base64Image.indexOf(";"));
+            
+            const editedImageBase64 = await editImageWithPrompt(base64Image, mimeType, aiEditingState.prompt);
+            const newImageUrl = await imageService.uploadImage(editedImageBase64);
+            
+            handleImageSave(aiEditingState.post.id, newImageUrl);
+
+        } catch (error) { 
+            console.error("AI editing failed", error); 
+            alert(`فشل تعديل الصورة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
+        } finally { 
+            setAiEditingState(null); 
+        }
     }
     
     const handleFetchCaptionIdeas = async (post: PostWithStatus) => {
@@ -193,7 +205,7 @@ const ClientDashboardPage: React.FC<ClientDashboardPageProps> = ({ client, onUpd
         switch (activeView) {
             case 'content': return <ContentCalendarView 
                 posts={postsToShow}
-                futureWeeks={client.prescription.futureWeeksPlan}
+                futureWeeks={client.prescription?.futureWeeksPlan || []}
                 isGenerating={generatingWeeks}
                 onGenerateWeek={handleGenerateWeekContent}
                 client={client}
@@ -314,6 +326,7 @@ const ContentCalendarView: React.FC<{
     const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
+    const [isPdfLoading, setIsPdfLoading] = useState(false);
 
     const handleCopy = (post: PostWithStatus) => {
         const textToCopy = `${post.caption}\n\n${post.hashtags}`;
@@ -334,11 +347,37 @@ const ContentCalendarView: React.FC<{
             setIsDownloading(null);
         }
     };
+    
+    const handleDownloadPdf = async () => {
+        setIsPdfLoading(true);
+        try {
+            if(client.prescription){
+                await exportContentPlanAsPDF(client.prescription, client.consultationData.business.name);
+            }
+        } catch (error) {
+            console.error("Failed to generate content plan PDF", error);
+            alert("حدث خطأ أثناء إنشاء ملف الـ PDF.");
+        } finally {
+            setIsPdfLoading(false);
+        }
+    }
 
     return <>
         <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">تقويم المحتوى</h1>
-            <p className="text-slate-400 mb-8">هنا تجد كل المحتوى الجاهز للنشر مع أدوات التعديل والجدولة.</p>
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+                <div>
+                    <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">تقويم المحتوى الإعلاني</h1>
+                    <p className="text-slate-400">هنا تجد كل إعلاناتك الجاهزة للنشر مع أدوات التعديل والجدولة.</p>
+                </div>
+                <button
+                    onClick={handleDownloadPdf}
+                    disabled={isPdfLoading}
+                    className="flex-shrink-0 bg-slate-700 text-white font-bold py-2 px-5 rounded-full hover:bg-slate-600 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                    {isPdfLoading ? <LoadingSpinner className="w-5 h-5"/> : <DownloadIcon className="w-5 h-5" />}
+                    {isPdfLoading ? 'جاري التجهيز...' : 'تحميل الخطة PDF'}
+                </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {posts.map((post) => (
                     <div key={post.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col shadow-lg transition-all duration-300 hover:shadow-teal-500/10">
@@ -412,8 +451,9 @@ const ContentCalendarView: React.FC<{
 };
 
 const AnnualStrategyView: React.FC<{ client: Client }> = ({ client }) => {
-    const { strategy } = client.prescription;
+    const strategy = client.prescription?.strategy;
     const [elaboration, setElaboration] = useState<{ index: number; text: string; isLoading: boolean } | null>(null);
+    const [isPdfLoading, setIsPdfLoading] = useState(false);
 
     const handleElaborate = async (step: string, index: number) => {
         setElaboration({ index, text: '', isLoading: true });
@@ -426,16 +466,40 @@ const AnnualStrategyView: React.FC<{ client: Client }> = ({ client }) => {
             setElaboration({ index, text: 'حدث خطأ أثناء جلب التفاصيل.', isLoading: false });
         }
     };
+    
+    const handleDownloadPdf = async () => {
+        setIsPdfLoading(true);
+        try {
+            await exportElementAsPDF('strategy-container', `${client.consultationData.business.name}-Strategy.pdf`);
+        } catch (error) {
+            console.error("Failed to generate strategy PDF", error);
+            alert("حدث خطأ أثناء إنشاء ملف الـ PDF.");
+        } finally {
+            setIsPdfLoading(false);
+        }
+    }
 
     return (
     <div>
-        <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">الاستراتيجية السنوية</h1>
-        <p className="text-slate-400 mb-8">خارطة طريقك طويلة الأمد لتحقيق نمو مستدام.</p>
-        <div className="bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-lg">
-            <div className="flex items-center gap-4 mb-4"><BrainCircuitIcon className="w-10 h-10 text-teal-400" /><h2 className="text-2xl sm:text-3xl font-bold text-teal-300">{strategy.title}</h2></div>
-            <p className="text-slate-300 mb-6 text-base sm:text-lg leading-relaxed">{strategy.summary}</p>
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+            <div>
+                <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">الاستراتيجية السنوية</h1>
+                <p className="text-slate-400">خارطة طريقك طويلة الأمد لتحقيق نمو مستدام.</p>
+            </div>
+            <button 
+                onClick={handleDownloadPdf}
+                disabled={isPdfLoading}
+                className="flex-shrink-0 bg-slate-700 text-white font-bold py-2 px-5 rounded-full hover:bg-slate-600 transition disabled:opacity-50 flex items-center gap-2"
+            >
+                {isPdfLoading ? <LoadingSpinner className="w-5 h-5"/> : <DownloadIcon className="w-5 h-5" />}
+                {isPdfLoading ? 'جاري التجهيز...' : 'تحميل PDF'}
+            </button>
+        </div>
+        <div id="strategy-container" className="bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700 shadow-lg">
+            <div className="flex items-center gap-4 mb-4"><BrainCircuitIcon className="w-10 h-10 text-teal-400" /><h2 className="text-2xl sm:text-3xl font-bold text-teal-300">{strategy?.title}</h2></div>
+            <p className="text-slate-300 mb-6 text-base sm:text-lg leading-relaxed">{strategy?.summary}</p>
             <div className="space-y-4 border-t border-slate-700 pt-6">
-                {strategy.steps.map((step, i) => (
+                {(strategy?.steps || []).map((step, i) => (
                     <div key={i} className="p-4 rounded-lg bg-slate-900/50 transition-all">
                         <div className="flex justify-between items-start">
                              <div className="flex items-start">

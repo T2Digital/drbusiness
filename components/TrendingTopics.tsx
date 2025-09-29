@@ -44,7 +44,7 @@ export const TrendingTopics: React.FC = () => {
         <section id="trends" className="relative z-10 w-full max-w-6xl p-6 sm:p-8">
             <h2 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-white flex items-center justify-center gap-3">
                 <TrendingUpIcon className="w-8 h-8 text-teal-400" />
-                رادار الترندات النهاردة
+                نبض الشارع المصري على السوشيال ميديا
             </h2>
 
             {isLoading && (
@@ -62,7 +62,7 @@ export const TrendingTopics: React.FC = () => {
                             <h3 className="font-bold text-xl mb-4 text-teal-300">{trend.title}</h3>
                             <ul className="space-y-3">
                                 {trend.items.map((item, i) => (
-                                    <li key={i} className="text-slate-300 before:content-['-'] before:mr-2 before:text-teal-400">
+                                    <li key={i} className="text-slate-300 before:content-['🔥'] before:mr-2 before:text-teal-400/50">
                                         {item}
                                     </li>
                                 ))}

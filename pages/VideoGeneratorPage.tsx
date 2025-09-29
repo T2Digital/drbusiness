@@ -3,7 +3,6 @@ import { Package, VideoOperation } from '../types';
 import { toBase64 } from '../utils/helpers';
 import { LoadingSpinner, VideoIcon, Wand2Icon, Upload } from '../components/icons';
 import { startVideoGeneration, checkVideoGenerationStatus } from '../services/geminiService';
-import { API_BASE_URL } from '../services/backendService';
 
 
 const loadingMessages = [
@@ -82,12 +81,10 @@ const VideoGeneratorPage: React.FC<VideoGeneratorPageProps> = ({ selectedPackage
             if (operation.response?.generatedVideos?.[0]?.video?.uri) {
                 const downloadLink = operation.response.generatedVideos[0].video.uri;
                 
-                // Fetch the video through our secure backend proxy
-                const proxiedVideoUrl = `${API_BASE_URL}/ai/getVideo?uri=${encodeURIComponent(downloadLink)}`;
-                
-                const response = await fetch(proxiedVideoUrl);
+                // Append API key and fetch the video directly
+                const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
                 if (!response.ok) {
-                    throw new Error(`Failed to download video via proxy: ${response.statusText}`);
+                    throw new Error(`Failed to download video: ${response.statusText}`);
                 }
                 const videoBlob = await response.blob();
                 const objectUrl = URL.createObjectURL(videoBlob);

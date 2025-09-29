@@ -17,7 +17,9 @@
     "express": "^5.1.0",
     "cors": "^2.8.5",
     "buffer": "^6.0.3",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "jspdf": "^2.5.1",
+    "html2canvas": "^1.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
