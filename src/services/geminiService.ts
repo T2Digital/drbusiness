@@ -3,7 +3,6 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { imageService } from './imageService';
 
 // Initialize the Gemini AI model
-// FIX: Use process.env.API_KEY as required by coding guidelines and to fix vite/typescript error.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const textModel = 'gemini-2.5-flash';
 const imageEditModel = 'gemini-2.5-flash-image-preview';
@@ -67,8 +66,8 @@ export const generatePrescription = async (data: ConsultationData): Promise<Pres
     const finalWeek1Plan: DetailedPost[] = [];
     for (const post of prescriptionTextData.week1Plan) {
         try {
-            // Add a small delay between requests to be safe.
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Add a longer delay between requests to avoid rate limiting.
+            await new Promise(resolve => setTimeout(resolve, 5000));
             const generatedImageBase64 = await imageService.generateWithGemini(post.visualPrompt);
             const imageUrl = await imageService.uploadImage(generatedImageBase64);
             finalWeek1Plan.push({ ...post, generatedImage: imageUrl });
@@ -108,8 +107,8 @@ export const generateDetailedWeekPlan = async (
     const postsWithImages: DetailedPost[] = [];
     for (const post of detailedPosts) {
         try {
-             // Add a small delay between requests.
-            await new Promise(resolve => setTimeout(resolve, 1000));
+             // Add a longer delay between requests to avoid rate limiting.
+            await new Promise(resolve => setTimeout(resolve, 5000));
             const generatedImageBase64 = await imageService.generateWithGemini(post.visualPrompt);
             const imageUrl = await imageService.uploadImage(generatedImageBase64);
             postsWithImages.push({ ...post, generatedImage: imageUrl });

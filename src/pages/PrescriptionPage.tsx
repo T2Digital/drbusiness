@@ -125,7 +125,7 @@ const PrescriptionPage: React.FC<PrescriptionPageProps> = ({ prescription, consu
                                                             src={displayImage} 
                                                             alt={post.visualPrompt} 
                                                             className="w-full h-full object-cover cursor-pointer"
-                                                            onClick={() => setPreviewImageUrl(displayImage)}
+                                                            onClick={() => setPreviewImageUrl(displayImage || null)}
                                                         />
                                                         : <LoadingSpinner className="w-8 h-8 text-slate-500" />
                                                     )

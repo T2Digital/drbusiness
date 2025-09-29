@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-// FIX: Import PostWithStatus from types.ts to resolve circular dependency.
 import { Client, PostWithStatus } from '../types';
 import { imageService, ImageSearchResult } from '../services/imageService';
 import { enhanceVisualPrompt } from '../services/geminiService';

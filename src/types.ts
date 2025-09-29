@@ -32,7 +32,6 @@ export interface DetailedPost {
   caption: string;
   hashtags: string;
   visualPrompt: string;
-  // FIX: Added optional generatedImage property to align with its usage in dashboard components.
   generatedImage?: string;
 }
 
@@ -119,7 +118,6 @@ export interface AdCampaign {
 }
 
 export interface VideoOperation {
-    // FIX: Made 'name' optional to match the 'GenerateVideosOperation' type from the @google/genai SDK.
     name?: string;
     done: boolean;
     response?: {
@@ -131,14 +129,14 @@ export interface VideoOperation {
     };
 }
 
-// FIX: Added AnalyticsData interface for dashboard analytics.
 export interface AnalyticsData {
     followerGrowth: { value: number; trend: number };
     engagementRate: { value: number; trend: number };
     reach: { value: number; trend: number };
     weeklyPerformance: number[]; // 7 values for 7 days
 }
-// FIX: Moved PostWithStatus here from ClientDashboardPage.tsx to resolve a circular dependency.
+
+// Moved from ClientDashboardPage.tsx to break circular dependency
 export type PostWithStatus = DetailedPost & {
   id: string; // use a unique ID like week-index
   weekKey: string;

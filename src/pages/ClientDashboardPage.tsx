@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-// FIX: Added PostWithStatus to the import from types.ts to use the centralized definition.
 import { Prescription, Client, DetailedPost, FutureWeek, SocialConnections, AnalyticsData, PostWithStatus } from '../types';
 import { editImageWithPrompt, generateCaptionVariations, generateDetailedWeekPlan, elaborateOnStrategyStep, generateAnalyticsData } from '../services/geminiService';
-import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, LinkIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
+import { LoadingSpinner, DownloadIcon, CopyIcon, EditIcon, BrainCircuitIcon, Wand2Icon, SparklesIcon, CalendarIcon, LinkIcon, VideoIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon, LinkedinIcon, RefreshIcon } from '../components/icons';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ImageStudioModal } from '../components/ImageStudioModal';
 import { forceDownload, exportElementAsPDF, exportContentPlanAsPDF, urlToBase64 } from '../utils/helpers';
@@ -16,16 +15,6 @@ interface ClientDashboardPageProps {
   onNavigateToVideoStudio: () => void;
   userRole: 'admin' | 'client';
 }
-
-// FIX: Moved this type to `types.ts` to resolve a circular dependency issue.
-/*
-export type PostWithStatus = DetailedPost & {
-  id: string; // use a unique ID like week-index
-  weekKey: string;
-  isLoading: boolean;
-  generatedImage?: string; // This will now be a URL
-};
-*/
 
 type EditingPostState = { id: string; caption: string; hashtags: string; } | null;
 type AiEditingState = { post: PostWithStatus; prompt: string; isEditing: boolean; } | null;

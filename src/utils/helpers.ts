@@ -1,10 +1,11 @@
-import { Client, Prescription, DetailedPost } from "../types";
+
+import { Client, Prescription, DetailedPost } from "./types";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 // FIX: Embedded the Base64 font data directly into this file to resolve the module loading error.
 // This eliminates the need for a separate `tajawalFont.ts` file and fixes the import path issue.
-const tajawalFont = `AAEAAAARAQAABAAQR0RFRgABHAAAAHAAAAAAE........`;
+const tajawalFont = `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EAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQAFAAYABwAIAAkACgALAAwADQAOAA8AEBARABIAEwAUABUAFgAXABgAGQAaABsAHAAdAB4AHwAgACEAIgAjACQAJQAmACcAKAApACoAKwAsAC0ALgAvADAAMQAyADMANAA1ADYANwA4ADkAOgA7ADwAPQA+AD8AQABBAEIAQwBEAEUARgBHAEgASQBKAEsATABNAE4ATwBQAFEAUgBTAFQAVQBWAFcAWABZAFoAWwBcAF0AXgBfAGAAYgBjAGQAZQBmAGcAaABpAGoAawBsAG0AbgBvAHAAcQByAHMAdAB1AHYAdwB4AHkAegB7AHwAfQB+AIAAgQCCAIMAhACHAIgAiQCLAIwAjQCOAJAAkQCSAJMAlACVAJYAlwCYAJoAnACdAKAAoQCiAKMApACkAKUApgCnAKgAqQCrAKwArQCuAK8AsACxALIAsgC0ALUAtgC3ALgAugC7ALwAvgDGAMgA1wDYANkA2gDcAN0A3gDfAOEA4gDjAOQA5QDrAOwA8ADyAPMA9AD1APYA9wD4APkA+gD7APwA/QD+AP8BAAEAAAACAQMDBAEEAQUBBgEHAQgBCQEKAQsBDAENAQ4BDwEQARIBEwAAVAAAQABEAAAAYABkAGgAcAB4AIAAiACQAJgAoACoALAAtAC4AMgA0ADYAPAJA//8AAQAAAAAAAQAAAAAAAQALAAMAAQAAAAAAAQAEAAgAAQAAAAAAAgADAAoAAQAAAAAAAwAMABEAAQAAAAAABAAQABoAAQAAAAAABQASACMAAQAAAAAABgAQACsAAQAAAAAACgAsADUAAQAAAAAACwASAFMAAQAAAAAADAAUAGMAAQAAAAAADgAUAHEAAwABBAkAAAACAGwAAwABBAkAAQAMAHgAAwABBAkAAgAQAIwAAwABBAkAAwAYAJIAAwABBAkABAAsAKIAAwABBAkABQAUALwAAwABBAkABgAQAMYAAwABBAkACgA8ANwAAwABBAkACwA4APIAAwABBAkADAAcASgAAwABBAkADgAcATIAVABhAGoAYQB3AGEAbABSAGUAZwB1...";
 
 
 // This file can be used for helper functions in the future.
@@ -139,83 +140,88 @@ export const exportElementAsPDF = async (elementId: string, fileName: string) =>
  * @param businessName The name of the client's business.
  */
 export const exportContentPlanAsPDF = async (prescription: Prescription, businessName: string) => {
-    const doc = new jsPDF();
-    doc.addFileToVFS('Tajawal-Regular.ttf', tajawalFont);
-    doc.addFont('Tajawal-Regular.ttf', 'Tajawal', 'normal');
-    doc.setFont('Tajawal');
-    doc.setR2L(true);
+    try {
+        const doc = new jsPDF();
+        // The font needs to be added to the virtual file system before it can be used.
+        doc.addFileToVFS('Tajawal-Regular.ttf', tajawalFont);
+        doc.addFont('Tajawal-Regular.ttf', 'Tajawal', 'normal');
+        doc.setFont('Tajawal');
+        doc.setR2L(true);
 
-    // --- TITLE PAGE ---
-    doc.setFontSize(26);
-    doc.text("خطة المحتوى الإعلاني", 105, 130, { align: 'center' });
-    doc.setFontSize(18);
-    doc.text(`لـ: ${businessName}`, 105, 145, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text("تم إنشاؤها بواسطة دكتور بزنس", 105, 160, { align: 'center' });
-
-
-    // --- CONTENT PAGES ---
-    let y = 25;
-
-    const allPosts: DetailedPost[] = [
-        ...(prescription.week1Plan || []),
-        ...Object.values(prescription.detailedPlans || {}).flat()
-    ];
-
-    if (allPosts.length === 0) {
-        doc.addPage();
-        doc.text("لا يوجد محتوى جاهز للطباعة بعد.", 200, 25, { align: 'right' });
-    }
-
-    for (const [index, post] of allPosts.entries()) {
-        if (index === 0) {
-            doc.addPage();
-        }
-
-        const pageHeight = doc.internal.pageSize.height;
-        let requiredHeight = 20; // Initial height for title
-        const captionLines = doc.splitTextToSize(post.caption, 180);
-        requiredHeight += captionLines.length * 5 + 5;
-        if (post.generatedImage) requiredHeight += 65;
-
-        if (y + requiredHeight > pageHeight) {
-            doc.addPage();
-            y = 25;
-        }
-
-        doc.setFontSize(14);
-        doc.setTextColor("#009688"); // Teal color
-        doc.text(`${post.day} - ${post.platform} (${post.adType})`, 200, y, { align: 'right' });
-        y += 8;
-
+        // --- TITLE PAGE ---
+        doc.setFontSize(26);
+        doc.text("خطة المحتوى الإعلاني", 105, 130, { align: 'center' });
+        doc.setFontSize(18);
+        doc.text(`لـ: ${businessName}`, 105, 145, { align: 'center' });
         doc.setFontSize(10);
-        doc.setTextColor("#FFFFFF");
-        doc.text(captionLines, 200, y, { align: 'right' });
-        y += captionLines.length * 5 + 5;
+        doc.text("تم إنشاؤها بواسطة دكتور بزنس", 105, 160, { align: 'center' });
 
-        if (post.generatedImage) {
-            try {
-                // Ensure image is not drawn off-page
-                 if (y + 60 > pageHeight -10) {
-                    doc.addPage();
-                    y = 25;
-                 }
-                doc.addImage(post.generatedImage, 'PNG', 15, y, 60, 60);
-                
-            } catch (e) {
-                console.error("Could not add image to PDF", e);
-                doc.text("[فشل تحميل الصورة]", 190, y, { align: 'right' });
+
+        // --- CONTENT PAGES ---
+        let y = 25;
+
+        const allPosts: DetailedPost[] = [
+            ...(prescription.week1Plan || []),
+            ...Object.values(prescription.detailedPlans || {}).flat()
+        ];
+
+        if (allPosts.length === 0) {
+            doc.addPage();
+            doc.text("لا يوجد محتوى جاهز للطباعة بعد.", 200, 25, { align: 'right' });
+        } else {
+             doc.addPage();
+        }
+
+        for (const [index, post] of allPosts.entries()) {
+            const pageHeight = doc.internal.pageSize.height;
+            let requiredHeight = 20; // Initial height for title
+            const captionLines = doc.splitTextToSize(post.caption, 180);
+            requiredHeight += captionLines.length * 5 + 5;
+            if (post.generatedImage) requiredHeight += 65;
+
+            if (y + requiredHeight > pageHeight) {
+                doc.addPage();
+                y = 25;
+            }
+
+            doc.setFontSize(14);
+            doc.setTextColor("#009688"); // Teal color
+            doc.text(`${post.day} - ${post.platform} (${post.adType})`, 200, y, { align: 'right' });
+            y += 8;
+
+            doc.setFontSize(10);
+            doc.setTextColor("#FFFFFF");
+            doc.text(captionLines, 200, y, { align: 'right' });
+            y += captionLines.length * 5 + 5;
+
+            if (post.generatedImage) {
+                try {
+                    // Ensure image is not drawn off-page
+                    if (y + 60 > pageHeight -10) {
+                        doc.addPage();
+                        y = 25;
+                    }
+                    doc.addImage(post.generatedImage, 'PNG', 15, y, 60, 60);
+                    
+                } catch (e) {
+                    console.error("Could not add image to PDF", e);
+                    doc.text("[فشل تحميل الصورة]", 190, y, { align: 'right' });
+                }
+            }
+            y += 65; // Move cursor down past image
+            
+            // Separator line
+            if (index < allPosts.length - 1) {
+                doc.setDrawColor("#475569"); // slate-600
+                doc.line(10, y, 200, y);
+                y += 10;
             }
         }
-         y += 65; // Move cursor down past image
-        
-        // Separator line
-        if (index < allPosts.length - 1) {
-            doc.setDrawColor("#475569"); // slate-600
-            doc.line(10, y, 200, y);
-            y += 10;
-        }
-    }
 
-    doc.save(`${businessName}-Content-Plan.pdf`);
+        doc.save(`${businessName}-Content-Plan.pdf`);
+    } catch (error) {
+        console.error("Failed to generate content plan PDF", error);
+        // Re-throw the error to be caught by the caller
+        throw error;
+    }
 };
